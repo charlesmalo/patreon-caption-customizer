@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "Patreon Caption Customizer",
+  "version": "2.4",
+  "description": "Move, resize and recolor Patreon captions/subtitles, adjust text + background opacity, and auto-scroll long captions.",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "patreon-caption-customizer@charlesmalo",
+      "strict_min_version": "115.0"
+    }
+  },
+  "icons": {
+    "48": "icons/icon-48.png",
+    "96": "icons/icon-96.png",
+    "128": "icons/icon-128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.patreon.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_start",
+      "all_frames": true
+    }
+  ]
+}

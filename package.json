@@ -1,0 +1,30 @@
+{
+  "name": "patreon-caption-customizer",
+  "version": "2.4.0",
+  "description": "Move, resize, and recolor Patreon captions/subtitles with a draggable overlay. Ships as a userscript and as Chrome/Opera and Firefox extensions, all built from one source.",
+  "license": "MIT",
+  "author": "charlesmalo",
+  "homepage": "https://github.com/charlesmalo/patreon-caption-customizer",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/charlesmalo/patreon-caption-customizer.git"
+  },
+  "scripts": {
+    "build": "node build.js",
+    "test": "node test/simulate.js",
+    "check": "node --check src/caption-customizer.js",
+    "verify": "npm run check && npm run build && npm test"
+  },
+  "keywords": [
+    "patreon",
+    "captions",
+    "subtitles",
+    "userscript",
+    "tampermonkey",
+    "greasemonkey",
+    "chrome-extension",
+    "firefox-extension",
+    "webvtt",
+    "accessibility"
+  ]
+}
