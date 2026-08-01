@@ -1,6 +1,7 @@
 // ==UserScript==
 // @name         Patreon Caption Customizer — Move, Resize & Recolor Captions & Subtitles Text
 // @namespace    local
+// @author       Charles M.
 // @version      2.5
 // @description  Drag Patreon captions/subtitles anywhere, resize the text container (free-form), set font size, text color, and background color + opacity, and optionally auto-scroll long captions. Hover controls with a close delay. Everything persists across videos and reloads.
 // @match        https://www.patreon.com/*
