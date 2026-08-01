@@ -1,11 +1,11 @@
 {
   "manifest_version": 3,
-  "name": "Patreon Caption Customizer",
-  "version": "2.5",
-  "description": "Move, resize and recolor Patreon captions/subtitles, adjust text + background opacity, and auto-scroll long captions.",
+  "name": "Video Streaming Caption Customizer",
+  "version": "2.6",
+  "description": "Move, resize & recolor video captions/subtitles on streaming sites (Patreon, Vimeo, Streamable, hls.js/Shaka/Video.js players).",
   "browser_specific_settings": {
     "gecko": {
-      "id": "patreon-caption-customizer@charlesmalo",
+      "id": "video-streaming-caption-customizer@charlesmalo",
       "strict_min_version": "115.0"
     }
   },
@@ -17,7 +17,7 @@
   "content_scripts": [
     {
       "matches": [
-        "https://*.patreon.com/*"
+        "*://*/*"
       ],
       "js": [
         "content.js"

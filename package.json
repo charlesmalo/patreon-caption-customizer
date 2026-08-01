@@ -1,7 +1,7 @@
 {
   "name": "patreon-caption-customizer",
   "version": "2.5.0",
-  "description": "Move, resize, and recolor Patreon captions/subtitles with a draggable overlay. Ships as a userscript and as Chrome/Opera and Firefox extensions, all built from one source.",
+  "description": "Move, resize, and recolor captions/subtitles on video streaming sites (Patreon, Vimeo, Streamable, and hls.js/Shaka/Video.js/Plyr/JW Player based players) with a draggable overlay. Ships as a userscript and as Chrome/Opera and Firefox extensions, all built from one source.",
   "license": "MIT",
   "author": "Charles M.",
   "homepage": "https://github.com/charlesmalo/patreon-caption-customizer",
@@ -16,15 +16,20 @@
     "verify": "npm run check && npm run build && npm test"
   },
   "keywords": [
-    "patreon",
+    "video-streaming",
     "captions",
     "subtitles",
+    "closed-captions",
+    "patreon",
+    "vimeo",
+    "streamable",
+    "hls",
+    "webvtt",
     "userscript",
     "tampermonkey",
     "greasemonkey",
     "chrome-extension",
     "firefox-extension",
-    "webvtt",
     "accessibility"
   ]
 }

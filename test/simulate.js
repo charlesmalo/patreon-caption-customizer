@@ -96,6 +96,7 @@ class FakeElement {
   get textContent() { return this.childNodes.map((n) => n.textContent || '').join(''); }
   set textContent(v) { this.childNodes.slice().forEach((k) => this._remove(k)); if (v !== '' && v != null) this._adopt(new FakeText(String(v))); }
   get scrollHeight() { return this._scrollHeight || 0; }
+  get parentElement() { return this.parentNode && this.parentNode.nodeType === 1 ? this.parentNode : null; }
   _adopt(node) {
     if (node.nodeType === 11) { const kids = node.childNodes.slice(); node.childNodes.length = 0; kids.forEach((k) => this._adopt(k)); return; }
     if (node.parentNode) node.parentNode._remove(node);
@@ -275,6 +276,20 @@ test('attaching a video creates exactly one overlay', () => {
   const c = makeContainer();
   makeVideo(c);
   eq(boxIn(c).length, 1, 'overlay count');
+});
+
+test('attaches generically on a container without a "player" class', () => {
+  const c = documentMock.createElement('div');
+  c.className = 'some-generic-wrapper';        // no "player" in the class name
+  c.style.position = 'static';
+  c._rect = { left: 0, top: 0, width: 640, height: 360 };
+  ROOT.appendChild(c);
+  flushMutations();
+  const v = documentMock.createElement('video');
+  v.textTracks = makeTrackList();
+  c.appendChild(v);
+  flushMutations();
+  eq(qsa(c, '.pcr-box').length, 1, 'overlay attached via the video parent fallback');
 });
 
 test('re-scanning does not duplicate the overlay (video already seen)', () => {

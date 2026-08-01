@@ -1,26 +1,27 @@
 // ==UserScript==
-// @name         Patreon Caption Customizer — Move, Resize & Recolor Captions & Subtitles Text
-// @namespace    local
+// @name         Video Streaming Caption Customizer — Move, Resize & Recolor Captions & Subtitles
+// @namespace    https://github.com/charlesmalo
 // @author       Charles M.
-// @version      2.5
-// @description  Drag Patreon captions/subtitles anywhere, resize the text container (free-form), set font size, text color, and background color + opacity, and optionally auto-scroll long captions. Hover controls with a close delay. Everything persists across videos and reloads.
-// @match        https://www.patreon.com/*
+// @version      2.6
+// @description  Move, resize & recolor captions/subtitles on video streaming sites. Drag anywhere, resize the box, set font size, text color, and background opacity, with optional auto-scroll. Works on players using native HTML5 WebVTT captions: Patreon, Vimeo, Streamable, and hls.js / Shaka / Video.js / Plyr / JW Player based sites.
+// @match        *://*/*
 // @run-at       document-start
 // @grant        none
 // @license      MIT
 // ==/UserScript==
 /**
- * Patreon Caption Customizer
- * ==========================
+ * Video Streaming Caption Customizer
+ * ==================================
  *
  * WHAT IT DOES
- *   Replaces Patreon's fixed, bottom-anchored captions with a caption box you
- *   can freely reposition, resize (as a text container), and recolor — similar
- *   to YouTube's draggable captions. Your settings are saved and reused across
- *   videos and page reloads until changed.
+ *   Replaces a streaming site's fixed, bottom-anchored captions with a caption
+ *   box you can freely reposition, resize (as a text container), and recolor —
+ *   similar to YouTube's draggable captions. Works on video players that expose
+ *   native HTML5 WebVTT captions (see SUPPORTED SITES). Your settings are saved
+ *   and reused across videos and page reloads until changed.
  *
  * HOW TO USE (once installed in Tampermonkey / Greasemonkey or as an extension)
- *   1. Open a Patreon video and turn captions on with the player's CC button.
+ *   1. Open a video on a supported site and turn captions on with the CC button.
  *   2. MOVE   : click-drag the caption box anywhere over the video.
  *   3. RESIZE : hover the box, then drag the bottom-right corner handle to size
  *               the text CONTAINER — drag right for a wider box, down for a
@@ -44,14 +45,20 @@
  *   the whole caption reads for about 3 seconds. Toggle it with the toolbar's
  *   "Auto-scroll" checkbox; when off, the box grows to show the caption in full.
  *
+ * SUPPORTED SITES
+ *   Any site whose player exposes native HTML5 WebVTT caption tracks. Confirmed
+ *   on Patreon; also targets Vimeo, Streamable, and players built on hls.js,
+ *   Shaka Player, dash.js, Video.js, Plyr, or JW Player. NOT YouTube — it uses
+ *   its own caption system and already offers similar customization.
+ *
  * HOW IT WORKS
- *   Patreon renders captions through the browser's native WebVTT text tracks.
- *   This script sets the active caption track to `mode = "hidden"` — the browser
- *   stops drawing captions but still fires `cuechange` — then renders each cue
- *   into its own absolutely-positioned overlay it fully controls. Position and
- *   size are stored as percentages of the player, so they survive resizing and
- *   fullscreen. A MutationObserver re-attaches the overlay as Patreon's
- *   single-page app swaps video elements in and out.
+ *   These players deliver captions through the browser's native WebVTT text
+ *   tracks. This script sets the active caption track to `mode = "hidden"` — the
+ *   browser stops drawing captions but still fires `cuechange` — then renders
+ *   each cue into its own absolutely-positioned overlay it fully controls.
+ *   Position and size are stored as percentages of the player, so they survive
+ *   resizing and fullscreen. A MutationObserver re-attaches the overlay as
+ *   single-page apps swap video elements in and out.
  *
  * PRIVACY / SAFETY
  *   No network requests, no tracking, no personal data. All state lives in a
@@ -88,6 +95,20 @@
     return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${clamp(a, 0, 1)})`;
   };
   const el = (tag, cls) => { const e = document.createElement(tag); if (cls) e.className = cls; return e; };
+  // Find the player area to anchor the overlay to: the nearest ancestor whose
+  // class looks like a video player (covers most sites, incl. Patreon's
+  // VideoPlayerRoot), else the video's direct parent. Generic across streaming
+  // sites that render captions with native HTML5 text tracks.
+  const findContainer = (v) => {
+    let n = v.parentElement, generic = null;
+    while (n && n !== document.body && n.nodeType === 1) {
+      const c = String(n.className || '');
+      if (/VideoPlayerRoot/.test(c)) return n;          // exact prior Patreon anchor
+      if (!generic && /player/i.test(c)) generic = n;   // nearest player-ish wrapper elsewhere
+      n = n.parentElement;
+    }
+    return generic || v.parentElement;
+  };
 
   // ---- Styles --------------------------------------------------------------
   const CSS = `
@@ -129,7 +150,7 @@
     if (seen.has(video)) return;
     seen.add(video);
 
-    const container = video.closest('[class*="VideoPlayerRoot"]') || video.parentElement;
+    const container = findContainer(video);
     if (!container) return;
     if (getComputedStyle(container).position === 'static') container.style.position = 'relative';
     container.querySelectorAll(':scope > .pcr-box').forEach((n) => n.remove()); // never stack

@@ -1,10 +1,10 @@
-# Patreon Caption Customizer
+# Video Streaming Caption Customizer
 
-Take control of captions and subtitles on Patreon videos. Move them anywhere on
-the player, resize the text, recolor the text **and** the background box
-(with independent opacity), and optionally auto-scroll long captions within a
-tidy two-line window — YouTube-style. Your settings persist across videos and
-reloads.
+Take control of captions and subtitles on **video streaming sites**. Move them
+anywhere on the player, resize the caption box, set the font size, recolor the
+text, and recolor the background box with its own opacity, plus optional
+auto-scrolling for long captions — YouTube-style. Your settings persist across
+videos and reloads.
 
 Ships three ways, all built from **one source file**:
 
@@ -14,14 +14,35 @@ Ships three ways, all built from **one source file**:
 | Chrome extension | [`chrome-extension/`](chrome-extension/) | Chrome, Opera, Edge (MV3) |
 | Firefox extension | [`firefox-extension/`](firefox-extension/) | Firefox (MV3) |
 
+## Supported sites
+
+Works on any video player that exposes **native HTML5 WebVTT caption tracks** —
+which is a large class of the modern web. Confirmed on **Patreon**; also targets
+**Vimeo**, **Streamable**, and sites built on **hls.js**, **Shaka Player**,
+**dash.js**, **Video.js**, **Plyr**, or **JW Player**.
+
+Not every site works: some players (most notably **YouTube**) draw captions with
+their own system rather than native tracks — YouTube already includes similar
+drag/resize/color/position options, so it's out of scope. To check any site,
+open DevTools on a video page and run:
+
+```js
+[...(document.querySelector('video')?.textTracks ?? [])].map(t => ({kind:t.kind, cues:t.cues?.length}))
+```
+
+If it lists caption/subtitle tracks with cues, this tool works there.
+
+> Unofficial. Not affiliated with or endorsed by Patreon, Vimeo, Streamable, or any other site.
+
 ## Features
 
 - **Move** — drag the caption box anywhere (top, bottom, middle, sides).
-- **Resize** — drag the bottom-right corner to scale the font (outward bigger, inward smaller).
-- **Recolor** — hover the box for a toolbar with independent **color + opacity** for the text and for the background box.
-- **Auto-scroll (toggleable)** — long captions scroll up one line at a time inside a 2-line window, paced for reading; turn it off to show captions in full.
-- **Adaptive toolbar** — the controls flip above/below the box so they never overflow off the top of the frame.
-- **Persistent** — position, size, colors, opacity, and the auto-scroll preference are saved and reused across videos and reloads.
+- **Resize the container** — hover the box and drag the bottom-right corner to size the box freely (wider, taller, or both); words wrap by width and the height sets the reading window.
+- **Font size** — a slider in the toolbar.
+- **Recolor** — text color, and background box color **with its own opacity**; the text always stays fully opaque.
+- **Auto-scroll (toggleable)** — long captions scroll up one line at a time inside the box height, paced for reading; turn it off to grow the box and show captions in full.
+- **Adaptive, forgiving toolbar** — the controls flip above/below the box to stay on screen, appear on hover, and wait ~1s before closing so you can reach them.
+- **Persistent** — position, size, font, colors, opacity, and the auto-scroll preference are saved and reused across videos and reloads.
 - **Private & light** — no network requests, no tracking, no dependencies; all state in one `localStorage` key.
 
 ## Install
@@ -42,10 +63,10 @@ See each subproject's README for store-submission notes.
 
 ## Usage
 
-Open a Patreon video and turn captions on. Then:
+Open a video on a supported site and turn captions on. Then:
 - **Drag** the box to reposition it.
-- **Drag the corner handle** to change font size.
-- **Hover the box** to open the toolbar: set text/background color and opacity, and toggle **Auto-scroll long captions**.
+- **Hover** the box and **drag the corner handle** to resize the container.
+- The hover **toolbar** sets font size, text/background color and opacity, and toggles **Auto-scroll long captions**.
 - **Reset** restores defaults.
 
 The box appears while a caption is on screen and stays put while you're actively adjusting it.
@@ -67,13 +88,13 @@ shipped artifact. See [AGENTS.md](AGENTS.md) for contributor guidance.
 
 ## How it works
 
-Patreon renders captions through the browser's native WebVTT text tracks. The
-script sets the active caption track to `mode = "hidden"` (the browser stops
-drawing the captions but still fires `cuechange` events), then renders each cue
-into its own absolutely-positioned overlay it fully controls. Position is stored
-as a percentage of the player, so it survives resizing and fullscreen, and a
-MutationObserver re-attaches the overlay as Patreon's single-page app swaps
-videos in and out.
+These players deliver captions through the browser's native WebVTT text tracks.
+The script sets the active caption track to `mode = "hidden"` (the browser stops
+drawing the captions but still fires `cuechange`), then renders each cue into
+its own absolutely-positioned overlay it fully controls. Position and size are
+stored as percentages of the player, so they survive resizing and fullscreen,
+and a MutationObserver re-attaches the overlay as single-page apps swap videos
+in and out.
 
 ## License
 
