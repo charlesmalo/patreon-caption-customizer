@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Patreon Caption Customizer",
-  "version": "2.4",
+  "version": "2.5",
   "description": "Move, resize and recolor Patreon captions/subtitles, adjust text + background opacity, and auto-scroll long captions.",
   "browser_specific_settings": {
     "gecko": {

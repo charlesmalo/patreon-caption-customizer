@@ -392,17 +392,57 @@ test('dragging updates position, flips the toolbar, and persists', () => {
   assert(box.classList.contains('pcr-flip'), 'toolbar flipped below (top half)');
 });
 
-test('corner-resize changes the font size and persists', () => {
+test('corner-resize changes container width/height (free-form) and persists', () => {
   const c = makeContainer();
   const v = makeVideo(c);
   enableCaptions(v);
   const box = boxIn(c)[0];
-  fire(findByClass(box, 'pcr-reset'), 'click'); // fontPx=22
+  fire(findByClass(box, 'pcr-reset'), 'click'); // widthPct=55, heightPct=16
   const handle = findByClass(box, 'pcr-handle');
   fire(handle, 'pointerdown', { clientX: 0, clientY: 0 });
-  fire(handle, 'pointermove', { clientX: 100, clientY: 100 }); // d=100 → +20px
+  fire(handle, 'pointermove', { clientX: 64, clientY: 36 }); // +2*64/640*100=+20w, +2*36/360*100=+20h
   fire(handle, 'pointerup', {});
-  eq(readLS().fontPx, 42, 'fontPx persisted');
+  near(readLS().widthPct, 75, 1, 'widthPct persisted');
+  near(readLS().heightPct, 36, 1, 'heightPct persisted');
+});
+
+test('font slider changes the font size and persists', () => {
+  const c = makeContainer();
+  const v = makeVideo(c);
+  enableCaptions(v);
+  const box = boxIn(c)[0];
+  fire(findByClass(box, 'pcr-reset'), 'click');
+  const font = box.querySelectorAll('input').find((i) => i.type === 'range' && i.max === '72');
+  font.value = '40'; fire(font, 'input');
+  eq(readLS().fontPx, 40, 'fontPx persisted');
+  eq(box.style.fontSize, '40px', 'font applied');
+});
+
+test('text stays fully opaque; opacity slider only affects the background', () => {
+  const c = makeContainer();
+  const v = makeVideo(c);
+  enableCaptions(v);
+  const box = boxIn(c)[0];
+  const bgAlpha = box.querySelectorAll('input').find((i) => i.type === 'range' && i.max === '100');
+  bgAlpha.value = '20'; fire(bgAlpha, 'input');
+  assert(/,\s*1\)$/.test(box.style.color), `text opaque, got ${box.style.color}`);
+  assert(/0?\.2\)$/.test(box.style.background), `bg at 0.2, got ${box.style.background}`);
+  const inputs = box.querySelectorAll('input').filter((i) => i.type === 'range');
+  eq(inputs.length, 2, 'exactly two sliders (font + background opacity), no text-opacity slider');
+});
+
+test('toolbar stays open ~1s after the mouse leaves (close delay)', () => {
+  const c = makeContainer();
+  const v = makeVideo(c);
+  const t = enableCaptions(v);
+  showCue(c, t, 'hello', 1);
+  const box = boxIn(c)[0];
+  fire(box, 'pointerenter');
+  assert(box.classList.contains('pcr-open'), 'opens on hover');
+  fire(box, 'pointerleave');
+  assert(box.classList.contains('pcr-open'), 'still open immediately after leaving');
+  clock.tick(1000);
+  assert(!box.classList.contains('pcr-open'), 'closed after 1s');
 });
 
 test('color + opacity controls update the box and persist', () => {
@@ -429,7 +469,8 @@ test('reset restores every default', () => {
   fire(findByClass(box, 'pcr-reset'), 'click');
   const ls = readLS();
   eq(ls.xPct, 50); eq(ls.yPct, 88); eq(ls.fontPx, 22);
-  eq(ls.textColor, '#FFFFFF'); eq(ls.textAlpha, 1);
+  eq(ls.widthPct, 55); eq(ls.heightPct, 16);
+  eq(ls.textColor, '#FFFFFF');
   eq(ls.bgColor, '#000000'); eq(ls.bgAlpha, 0.55);
   eq(ls.autoscroll, true);
 });
