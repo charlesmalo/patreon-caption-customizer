@@ -4,7 +4,18 @@
 // @author       Charles M.
 // @version      2.6
 // @description  Move, resize & recolor captions/subtitles on video streaming sites. Drag anywhere, resize the box, set font size, text color, and background opacity, with optional auto-scroll. Works on players using native HTML5 WebVTT captions: Patreon, Vimeo, Streamable, and hls.js / Shaka / Video.js / Plyr / JW Player based sites.
-// @match        *://*/*
+// @match        *://*.patreon.com/*
+// @match        *://*.vimeo.com/*
+// @match        *://*.streamable.com/*
+// @match        *://*.dailymotion.com/*
+// @match        *://*.ted.com/*
+// @match        *://*.twitch.tv/*
+// @match        *://*.kick.com/*
+// @match        *://*.wistia.com/*
+// @match        *://*.wistia.net/*
+// @match        *://*.brightcove.net/*
+// @match        *://*.floatplane.com/*
+// @match        *://*.nebula.tv/*
 // @run-at       document-start
 // @grant        none
 // @license      MIT

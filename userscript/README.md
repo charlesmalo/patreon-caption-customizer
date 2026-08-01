@@ -1,11 +1,12 @@
 # Userscript — Tampermonkey / Greasemonkey
 
-`patreon-caption-customizer.user.js` is the userscript build of Patreon Caption
-Customizer.
+`patreon-caption-customizer.user.js` is the userscript build of **Video
+Streaming Caption Customizer**.
 
 > Generated file — do not edit. Change [`../src/caption-customizer.js`](../src/caption-customizer.js)
-> (and [`userscript-header.txt`](userscript-header.txt) for `@version`/`@match`),
-> then run `npm run build` from the repo root.
+> (and [`userscript-header.txt`](userscript-header.txt) for `@version`, `@match`,
+> name, or description), then run `npm run build` from the repo root. The
+> `@match` block lists the supported streaming sites — add more there.
 
 ## Install
 

@@ -4,10 +4,14 @@ Guidance for AI agents and human contributors working in this repository.
 
 ## What this project is
 
-A small browser tool that replaces Patreon's fixed, bottom-anchored video
-captions with a **draggable, resizable, recolorable caption overlay** (similar
-to YouTube's movable captions), plus optional 2-line auto-scrolling for long
-captions. It ships in three forms, all built from a single source file.
+A small browser tool that replaces a video streaming site's fixed,
+bottom-anchored captions with a **draggable, resizable, recolorable caption
+overlay** (similar to YouTube's movable captions), plus optional auto-scrolling
+for long captions. It works on any player that exposes native HTML5 WebVTT
+caption tracks — confirmed on Patreon; also targets Vimeo, Streamable, and
+hls.js/Shaka/Video.js/Plyr/JW Player based sites (see the manifests'/header's
+curated `matches`/`@match` list). It ships in three forms, all built from a
+single source file.
 
 ## Golden rule: one source of truth
 
@@ -69,11 +73,23 @@ Commands:
 
 ## How it works (mechanism)
 
-Patreon renders captions via native WebVTT text tracks. The script sets the
-active caption track to `mode = "hidden"` (the browser stops drawing it but
-still fires `cuechange`), then renders each cue into its own absolutely
-positioned overlay that the user can drag, resize (font via corner handle),
-recolor (text + background color and opacity), and optionally auto-scroll.
+Supported players render captions via native WebVTT text tracks. The script
+finds the player container for a `<video>` (`findContainer`: nearest
+`VideoPlayerRoot`/player-ish ancestor, else the video's parent — so Patreon
+keeps its exact anchor while other sites still work), sets the active caption
+track to `mode = "hidden"` (the browser stops drawing it but still fires
+`cuechange`), then renders each cue into its own absolutely positioned overlay
+that the user can drag, resize (the container, via the corner handle), restyle
+(font size + text color + background color/opacity in the toolbar), and
+optionally auto-scroll.
+
+## Site coverage
+
+The tool runs on a **curated host list**, not all sites — edit the `@match`
+lines in `userscript/userscript-header.txt` and the `content_scripts[0].matches`
+arrays in both manifests to add/remove sites (keep the three in sync). Avoid
+`*://*/*`: it triggers browsers' "all websites" permission warning and heavier
+store review.
 
 ## Testing philosophy
 

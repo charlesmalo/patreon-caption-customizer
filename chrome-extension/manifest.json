@@ -12,7 +12,18 @@
   "content_scripts": [
     {
       "matches": [
-        "*://*/*"
+        "*://*.patreon.com/*",
+        "*://*.vimeo.com/*",
+        "*://*.streamable.com/*",
+        "*://*.dailymotion.com/*",
+        "*://*.ted.com/*",
+        "*://*.twitch.tv/*",
+        "*://*.kick.com/*",
+        "*://*.wistia.com/*",
+        "*://*.wistia.net/*",
+        "*://*.brightcove.net/*",
+        "*://*.floatplane.com/*",
+        "*://*.nebula.tv/*"
       ],
       "js": [
         "content.js"

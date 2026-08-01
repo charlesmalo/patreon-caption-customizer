@@ -32,6 +32,10 @@ open DevTools on a video page and run:
 
 If it lists caption/subtitle tracks with cues, this tool works there.
 
+The browser extensions run on a **curated list** of these sites (see each
+extension's `manifest.json` `matches`) rather than all websites, so the
+permission prompt stays specific — add more sites there as needed.
+
 > Unofficial. Not affiliated with or endorsed by Patreon, Vimeo, Streamable, or any other site.
 
 ## Features
@@ -95,6 +99,11 @@ its own absolutely-positioned overlay it fully controls. Position and size are
 stored as percentages of the player, so they survive resizing and fullscreen,
 and a MutationObserver re-attaches the overlay as single-page apps swap videos
 in and out.
+
+## Privacy
+
+No data collected, no network requests, no tracking — all settings stay in your
+browser's `localStorage`. See [PRIVACY.md](PRIVACY.md).
 
 ## License
 
