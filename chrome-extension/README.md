@@ -41,7 +41,7 @@ warning and heavier store review.
 2. Replace the placeholder `icons/` with real 16/32/48/128 px PNG artwork.
 3. Zip the **contents** of this folder (not the parent):
    ```bash
-   cd chrome-extension && zip -r ../patreon-caption-customizer-chrome.zip . -x '*.DS_Store'
+   cd chrome-extension && zip -r ../cyber-captions-customizer-chrome.zip . -x '*.DS_Store'
    ```
 4. Upload the zip in the [Chrome Web Store Developer Dashboard](https://chrome.google.com/webstore/devconsole).
 5. For the **privacy** section: the extension collects no data — link

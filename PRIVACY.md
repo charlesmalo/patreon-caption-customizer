@@ -46,4 +46,4 @@ repository.
 
 ## Contact
 Questions or concerns: open an issue at
-<https://github.com/charlesmalo/patreon-caption-customizer>.
+<https://github.com/charlesmalo/cyber-captions-customizer>.

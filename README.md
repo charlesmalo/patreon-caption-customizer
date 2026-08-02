@@ -53,7 +53,7 @@ permission prompt stays specific — add more sites there as needed.
 
 ### Userscript (quickest)
 1. Install [Tampermonkey](https://www.tampermonkey.net/) or Violentmonkey.
-2. Open [`userscript/patreon-caption-customizer.user.js`](userscript/patreon-caption-customizer.user.js) and let your manager install it.
+2. Open [`userscript/cyber-captions-customizer.user.js`](userscript/cyber-captions-customizer.user.js) and let your manager install it.
 
 ### Chrome / Opera / Edge (unpacked)
 1. Go to `chrome://extensions`, enable **Developer mode**.

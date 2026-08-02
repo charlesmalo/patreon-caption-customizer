@@ -39,7 +39,7 @@ developing.
 2. Replace the placeholder `icons/` with real 48/96/128 px PNG artwork.
 3. Zip the **contents** of this folder:
    ```bash
-   cd firefox-extension && zip -r ../patreon-caption-customizer-firefox.zip . -x '*.DS_Store'
+   cd firefox-extension && zip -r ../cyber-captions-customizer-firefox.zip . -x '*.DS_Store'
    ```
 4. Submit the zip at [addons.mozilla.org/developers](https://addons.mozilla.org/developers/).
 5. Data-collection disclosure: **none** — see [`../PRIVACY.md`](../PRIVACY.md).

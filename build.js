@@ -23,7 +23,7 @@ const HEADER = fs.readFileSync(path.join(ROOT, 'userscript', 'userscript-header.
 const VERSION = (HEADER.match(/@version\s+([^\s]+)/) || [])[1] || '0.0';
 
 // ---- 1) Userscript (Tampermonkey / Greasemonkey) ---------------------------
-fs.writeFileSync(path.join(ROOT, 'userscript', 'patreon-caption-customizer.user.js'), HEADER + SRC);
+fs.writeFileSync(path.join(ROOT, 'userscript', 'cyber-captions-customizer.user.js'), HEADER + SRC);
 
 // ---- 2 & 3) Extension content scripts --------------------------------------
 const genHeader = '/* Auto-generated from ../src/caption-customizer.js by build.js — do not edit directly. */\n';

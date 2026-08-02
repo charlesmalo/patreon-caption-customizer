@@ -18,7 +18,7 @@ single source file.
 **All behavior lives in `src/caption-customizer.js`.** Never edit the generated
 artifacts by hand — they are overwritten by the build:
 
-- `userscript/patreon-caption-customizer.user.js` — generated (header + src)
+- `userscript/cyber-captions-customizer.user.js` — generated (header + src)
 - `chrome-extension/content.js` — generated (copy of src)
 - `firefox-extension/content.js` — generated (copy of src)
 
@@ -30,7 +30,7 @@ Edit `src/caption-customizer.js`, then run `npm run build`.
 src/caption-customizer.js        Single source of truth (the IIFE)
 userscript/                      Subproject 1 — Tampermonkey / Greasemonkey
   userscript-header.txt          The // ==UserScript== metadata block (edit @version here)
-  patreon-caption-customizer.user.js   (generated)
+  cyber-captions-customizer.user.js   (generated)
 chrome-extension/                Subproject 2 — Chrome / Opera / Edge (MV3)
   manifest.json                  version synced from the userscript header by build.js
   content.js                     (generated)   icons/ (generated placeholders)

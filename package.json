@@ -1,13 +1,13 @@
 {
-  "name": "patreon-caption-customizer",
+  "name": "cyber-captions-customizer",
   "version": "2.5.0",
   "description": "Move, resize, and recolor captions/subtitles on video streaming sites (Patreon, Vimeo, Streamable, and hls.js/Shaka/Video.js/Plyr/JW Player based players) with a draggable overlay. Ships as a userscript and as Chrome/Opera and Firefox extensions, all built from one source.",
   "license": "MIT",
   "author": "Charles M.",
-  "homepage": "https://github.com/charlesmalo/patreon-caption-customizer",
+  "homepage": "https://github.com/charlesmalo/cyber-captions-customizer",
   "repository": {
     "type": "git",
-    "url": "https://github.com/charlesmalo/patreon-caption-customizer.git"
+    "url": "https://github.com/charlesmalo/cyber-captions-customizer.git"
   },
   "scripts": {
     "build": "node build.js",
