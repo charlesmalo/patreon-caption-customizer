@@ -2,6 +2,7 @@
 // @name         Video Streaming Caption Customizer — Move, Resize & Recolor Captions & Subtitles
 // @namespace    https://github.com/charlesmalo
 // @author       Charles M.
+// @icon         https://raw.githubusercontent.com/charlesmalo/patreon-caption-customizer/main/CyberCaptionsCustomizer.png
 // @version      2.6
 // @description  Move, resize & recolor captions/subtitles on video streaming sites. Drag anywhere, resize the box, set font size, text color, and background opacity, with optional auto-scroll. Works on players using native HTML5 WebVTT captions: Patreon, Vimeo, Streamable, and hls.js / Shaka / Video.js / Plyr / JW Player based sites.
 // @match        *://*.patreon.com/*

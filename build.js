@@ -64,11 +64,15 @@ const png = (size, [r, g, b, a]) => {
   const raw = Buffer.concat(Array.from({ length: size }, () => row));
   return Buffer.concat([sig, chunk('IHDR', ihdr), chunk('IDAT', zlib.deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]);
 };
-const COLOR = [24, 24, 24, 255]; // matches the caption toolbar; replace before store submission
+// Only write a placeholder when an icon is MISSING — never overwrite real
+// artwork. Real icons are generated from CyberCaptionsCustomizer.png via
+// `npm run icons` (see scripts/gen-icons.sh).
+const COLOR = [24, 24, 24, 255];
 for (const size of [16, 32, 48, 96, 128]) {
-  const buf = png(size, COLOR);
-  fs.writeFileSync(path.join(ROOT, 'chrome-extension', 'icons', `icon-${size}.png`), buf);
-  fs.writeFileSync(path.join(ROOT, 'firefox-extension', 'icons', `icon-${size}.png`), buf);
+  for (const dir of ['chrome-extension', 'firefox-extension']) {
+    const p = path.join(ROOT, dir, 'icons', `icon-${size}.png`);
+    if (!fs.existsSync(p)) fs.writeFileSync(p, png(size, COLOR));
+  }
 }
 
 console.log(`Built v${VERSION}: userscript + chrome-extension + firefox-extension (content.js, icons, synced manifest versions).`);

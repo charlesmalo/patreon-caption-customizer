@@ -11,6 +11,7 @@
   },
   "scripts": {
     "build": "node build.js",
+    "icons": "bash scripts/gen-icons.sh",
     "test": "node test/simulate.js",
     "check": "node --check src/caption-customizer.js",
     "verify": "npm run check && npm run build && npm test"
