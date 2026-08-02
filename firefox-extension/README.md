@@ -14,15 +14,18 @@ their embedded player frames) — **not** all websites. Current list in
 `manifest.json` (`content_scripts[0].matches`):
 
 ```
-patreon.com, vimeo.com, streamable.com, dailymotion.com, ted.com,
-twitch.tv, kick.com, wistia.com, wistia.net, brightcove.net,
-floatplane.com, nebula.tv
+patreon.com, youtube.com, youtube-nocookie.com, vimeo.com, streamable.com,
+dailymotion.com, ted.com, twitch.tv, kick.com, wistia.com, wistia.net,
+brightcove.net, floatplane.com, nebula.tv
 ```
 
-It activates only when a page's player exposes native HTML5 WebVTT caption
-tracks. **To add a site:** append a match like `"*://*.example.com/*"` to that
-`matches` array (add it to `../chrome-extension/manifest.json` too). Avoid
-`*://*/*` — it triggers an all-sites permission warning and heavier review.
+On **YouTube** the overlay mirrors YouTube's own caption text; elsewhere it
+activates when the player exposes native HTML5 WebVTT caption tracks. Toggle any
+site on/off in the **settings dashboard** (gear button, or the add-on's Options
+page). **To add a curated site permanently:** append a match like
+`"*://*.example.com/*"` to that `matches` array (add it to
+`../chrome-extension/manifest.json` too). Avoid `*://*/*`. Users can also add a
+site at runtime via the dashboard (`optional_permissions`).
 
 ## Load temporarily (development)
 
@@ -43,6 +46,16 @@ developing.
    ```
 4. Submit the zip at [addons.mozilla.org/developers](https://addons.mozilla.org/developers/).
 5. Data-collection disclosure: **none** — see [`../PRIVACY.md`](../PRIVACY.md).
+
+## Settings dashboard & permissions
+
+`options.html` loads the packaged `content.js` in "panel mode" to render the same
+dashboard used by the on-video gear button; `background.js` opens it on toolbar
+click and re-registers already-granted custom sites. Permissions: `storage`
+(save preferences) and `scripting` + `optional_permissions` (used only when a
+user adds a custom site — Firefox prompts for that one site). Dynamic
+registration via `scripting.registerContentScripts` may be unavailable on older
+Firefox; the code degrades gracefully if so.
 
 ## Notes
 

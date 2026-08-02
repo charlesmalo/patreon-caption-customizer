@@ -15,6 +15,14 @@ Streaming Caption Customizer**.
 2. Open `cyber-captions-customizer.user.js` in your browser (or drag it onto a
    tab) — the manager will prompt to install. Updates arrive when `@version` bumps.
 
+Works on **YouTube** plus the native-WebVTT sites in the `@match` list. Open the
+**settings dashboard** from the gear button on the caption toolbar or from the
+manager's per-script menu ("Caption Customizer settings"). Preferences are saved
+with `GM_getValue`/`GM_setValue` so defaults are shared across sites; the
+`@grant` lines in `userscript-header.txt` enable that. To run on a site not in
+`@match`, add a user-match in your manager's settings (see the dashboard's
+custom-site note).
+
 ## Publish to Greasy Fork
 
 1. Sign in at [greasyfork.org](https://greasyfork.org) and choose **Post a script → Write a new script**.

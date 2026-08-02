@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Video Streaming Caption Customizer",
-  "version": "2.6",
-  "description": "Move, resize & recolor video captions/subtitles on streaming sites (Patreon, Vimeo, Streamable, hls.js/Shaka/Video.js players).",
+  "version": "3.0.0",
+  "description": "Move, resize & recolor video captions/subtitles on streaming sites including YouTube (Patreon, Vimeo, Streamable, hls.js/Shaka/Video.js players). Set persistent default looks in the dashboard.",
   "browser_specific_settings": {
     "gecko": {
       "id": "video-streaming-caption-customizer@charlesmalo",
@@ -14,10 +14,34 @@
     "96": "icons/icon-96.png",
     "128": "icons/icon-128.png"
   },
+  "permissions": [
+    "storage",
+    "scripting"
+  ],
+  "optional_permissions": [
+    "*://*/*"
+  ],
+  "background": {
+    "scripts": [
+      "background.js"
+    ]
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "action": {
+    "default_title": "Caption Customizer settings",
+    "default_icon": {
+      "48": "icons/icon-48.png"
+    }
+  },
   "content_scripts": [
     {
       "matches": [
         "*://*.patreon.com/*",
+        "*://*.youtube.com/*",
+        "*://*.youtube-nocookie.com/*",
         "*://*.vimeo.com/*",
         "*://*.streamable.com/*",
         "*://*.dailymotion.com/*",

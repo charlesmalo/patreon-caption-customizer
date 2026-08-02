@@ -1,10 +1,12 @@
 /**
- * Simulation / stress test suite for patreon-captions-top.user.js
- * ---------------------------------------------------------------
- * Runs the real userscript against a lightweight fake DOM with a deterministic
+ * Simulation / stress test suite for src/caption-customizer.js
+ * ------------------------------------------------------------
+ * Runs the real source against a lightweight fake DOM with a deterministic
  * virtual clock and instrumented timers / rAF / MutationObserver, so we can
  * assert there are no timer leaks, no runaway mutation scans, no infinite
- * track-mode loops, no overlay stacking, and no crashes/stack overflows.
+ * track-mode (or YouTube self-trigger) loops, no overlay stacking, and no
+ * crashes/stack overflows — plus the tiered settings model, YouTube mirroring,
+ * the coverage gate, and the dashboard.
  *
  * Run:  node test/simulate.js
  */
@@ -128,6 +130,7 @@ const documentMock = {
   head: HEAD,
   activeElement: null,
   createElement: (tag) => new FakeElement(tag),
+  createTextNode: (t) => new FakeText(t),
   createDocumentFragment: () => new FakeFragment(),
   querySelectorAll: (sel) => { counters.qsaDocument++; return qsa(ROOT, sel); },
 };
@@ -178,9 +181,12 @@ class MutationObserverMock {
 }
 
 // --------------------------------------------------- install globals + load
+const locationMock = { hostname: 'www.patreon.com', href: 'https://www.patreon.com/posts/1', protocol: 'https:' };
+global.window = global; // so the source's `window.CaptionCustomizer` API is reachable
 Object.assign(global, {
   document: documentMock,
   localStorage: localStorageMock,
+  location: locationMock,
   getComputedStyle: getComputedStyleMock,
   requestAnimationFrame: rafMock,
   cancelAnimationFrame: cafMock,
@@ -188,14 +194,25 @@ Object.assign(global, {
   clearTimeout: clearTimeoutMock,
   MutationObserver: MutationObserverMock,
 });
+// Note: `chrome` and the GM_* functions are intentionally left undefined, so the
+// storage abstraction falls back to localStorage (synchronous) for the harness.
+
+// Seed the pre-v3 single-key format so we can assert the boot-time migration.
+localStorageMock.setItem('patreon-caption-style-v2', JSON.stringify({ fontPx: 33, color: '#ABCDEF' }));
 
 const SRC = fs.readFileSync(path.join(__dirname, '..', 'src', 'caption-customizer.js'), 'utf8');
 // eslint-disable-next-line no-eval
-(0, eval)(SRC); // run the userscript IIFE against our mocked globals
+(0, eval)(SRC); // run the IIFE against our mocked globals
+const CCC = global.CaptionCustomizer;
 
 // ----------------------------------------------------------- test builders
-const LS_KEY = 'patreon-caption-style-v2';
-const readLS = () => JSON.parse(localStorageMock.getItem(LS_KEY) || '{}');
+const SETTINGS_KEY = 'ccc-settings-v3';
+const LEGACY_KEY = 'patreon-caption-style-v2';
+const readSettings = () => JSON.parse(localStorageMock.getItem(SETTINGS_KEY) || '{}');
+const readOverride = (host) => (readSettings().overrides || {})[host || 'patreon.com'] || {};
+// Back-compat alias for tests that assert live-edit persistence (now stored as
+// the current host's session override rather than a single flat key).
+const readLS = () => readOverride('patreon.com');
 
 const makeContainer = () => {
   const c = documentMock.createElement('div');
@@ -267,6 +284,12 @@ const eq = (a, b, m) => { if (a !== b) throw new Error(`${m || ''} expected ${JS
 const near = (a, b, tol, m) => { if (Math.abs(a - b) > (tol || 0.5)) throw new Error(`${m || ''} expected ~${b} got ${a}`); };
 
 // ================================================================= SCENARIOS
+
+test('migrates the legacy single-key format into the patreon session override', () => {
+  eq(readOverride('patreon.com').fontPx, 33, 'legacy fontPx migrated');
+  eq(readOverride('patreon.com').textColor, '#ABCDEF', 'legacy color → textColor migrated');
+  delete CCC.settings.overrides['patreon.com']; CCC.save(); // start later tests clean
+});
 
 test('script loaded and scanned the document exactly once at init', () => {
   eq(counters.qsaDocument, 1, 'init document scan count');
@@ -476,18 +499,19 @@ test('color + opacity controls update the box and persist', () => {
   eq(readLS().bgAlpha, 0.5, 'bg alpha persisted');
 });
 
-test('reset restores every default', () => {
+test('reset clears the session override and restores the default look', () => {
   const c = makeContainer();
   const v = makeVideo(c);
   enableCaptions(v);
   const box = boxIn(c)[0];
+  const font = box.querySelectorAll('input').find((i) => i.type === 'range' && i.max === '72');
+  font.value = '40'; fire(font, 'input');
+  assert(Object.keys(readOverride('patreon.com')).length > 0, 'edit created a session override');
   fire(findByClass(box, 'pcr-reset'), 'click');
-  const ls = readLS();
-  eq(ls.xPct, 50); eq(ls.yPct, 88); eq(ls.fontPx, 22);
-  eq(ls.widthPct, 55); eq(ls.heightPct, 16);
-  eq(ls.textColor, '#FFFFFF');
-  eq(ls.bgColor, '#000000'); eq(ls.bgAlpha, 0.55);
-  eq(ls.autoscroll, true);
+  eq(Object.keys(readOverride('patreon.com')).length, 0, 'override cleared on reset');
+  eq(box.style.fontSize, '22px', 'font back to default');
+  eq(box.style.width, '55%', 'width back to default');
+  assert(/255,\s*255,\s*255/.test(box.style.color), 'text color back to white');
 });
 
 test('stress: 2000 benign mutations do not storm the observer or throw', () => {
@@ -503,8 +527,117 @@ test('memory: overlay count stays bounded after many video swaps', () => {
   eq(boxIn(c).length, 1, 'exactly one overlay after 100 swaps');
 });
 
+// ---------------------------------------------------- YouTube + settings tier
+
+const makeYTPlayer = () => {
+  const p = documentMock.createElement('div');
+  p.className = 'html5-video-player';
+  p.style.position = 'static';
+  p._rect = { left: 0, top: 0, width: 640, height: 360 };
+  ROOT.appendChild(p); flushMutations();
+  return p;
+};
+const makeYTVideo = (player) => {
+  const v = documentMock.createElement('video');
+  v.className = 'html5-main-video';
+  player.appendChild(v); flushMutations();
+  return v;
+};
+const setYTCaption = (player, lines) => {
+  qsa(player, '.ytp-caption-window-container').forEach((n) => n.remove());
+  // Always (re)append a container so the harness records an addition the observer
+  // reacts to (the harness models added nodes, not removals). An empty container
+  // — no visual lines — represents "caption cleared".
+  const cont = documentMock.createElement('div'); cont.className = 'ytp-caption-window-container';
+  const win = documentMock.createElement('div'); win.className = 'caption-window';
+  cont.appendChild(win);
+  (lines || []).forEach((t) => {
+    const vl = documentMock.createElement('div'); vl.className = 'caption-visual-line';
+    const seg = documentMock.createElement('span'); seg.className = 'ytp-caption-segment'; seg.textContent = t;
+    vl.appendChild(seg); win.appendChild(vl);
+  });
+  player.appendChild(cont);
+  flushMutations();
+};
+
+test('YouTube: mirrors the native caption DOM into our overlay and hides it', () => {
+  locationMock.hostname = 'www.youtube.com';
+  const p = makeYTPlayer();
+  makeYTVideo(p);
+  const box = qsa(p, '.pcr-box');
+  eq(box.length, 1, 'overlay attached on YouTube');
+  setYTCaption(p, ['hello from youtube']);
+  eq(findByClass(p, 'pcr-scroll').textContent, 'hello from youtube', 'mirrored YT caption text');
+  assert(box[0].classList.contains('pcr-on'), 'overlay visible while a caption is up');
+  assert(p.classList.contains('pcr-yt-hide'), "YouTube's own captions hidden");
+  setYTCaption(p, []);
+  assert(!box[0].classList.contains('pcr-on'), 'overlay hidden when caption clears');
+  locationMock.hostname = 'www.patreon.com';
+});
+
+test('tiered resolution: builtin < global < platform < override', () => {
+  CCC.settings.defaults.global = { fontPx: 30 };
+  CCC.settings.defaults.platforms = { 'vimeo.com': { fontPx: 40 } };
+  CCC.settings.overrides = {};
+  eq(CCC.resolveStyle('vimeo.com').fontPx, 40, 'platform default beats global');
+  eq(CCC.resolveStyle('nebula.tv').fontPx, 30, 'global applies where no platform default');
+  eq(CCC.resolveStyle('nebula.tv').textColor, '#FFFFFF', 'builtin fills the rest');
+  CCC.settings.overrides = { 'vimeo.com': { fontPx: 50 } };
+  eq(CCC.resolveStyle('vimeo.com').fontPx, 50, 'session override wins over defaults');
+  CCC.settings.defaults.global = {}; CCC.settings.defaults.platforms = {}; CCC.settings.overrides = {}; CCC.save();
+});
+
+test('coverage toggle hides then re-shows the overlay live (two-way)', () => {
+  locationMock.hostname = 'www.patreon.com';
+  const c = makeContainer();
+  const v = makeVideo(c);
+  const t = enableCaptions(v);
+  showCue(c, t, 'hi', 1);
+  const box = boxIn(c)[0];
+  assert(box.classList.contains('pcr-on'), 'visible while covered');
+  CCC.settings.coverage['patreon.com'] = false; CCC.save(); CCC.refresh();
+  assert(!box.classList.contains('pcr-on'), 'hidden when coverage turned off');
+  eq(readSettings().coverage['patreon.com'], false, 'coverage persisted');
+  CCC.settings.coverage['patreon.com'] = true; CCC.save(); CCC.refresh();
+  assert(box.classList.contains('pcr-on'), 'visible again when re-enabled');
+});
+
+test('dashboard: editing a global default persists and updates live overlays', () => {
+  locationMock.hostname = 'www.patreon.com';
+  const c = makeContainer();
+  const v = makeVideo(c);
+  const t = enableCaptions(v);
+  showCue(c, t, 'hi', 1);
+  const box = boxIn(c)[0];
+  delete CCC.settings.overrides['patreon.com']; CCC.save(); CCC.refresh();
+  CCC.openPanel();
+  const modal = qsa(ROOT, '.ccc-modal')[0];
+  assert(modal, 'dashboard opened');
+  const scope = qsa(modal, 'select')[0];
+  scope.value = 'global'; fire(scope, 'change');
+  const nums = qsa(modal, 'input').filter((i) => i.type === 'number');
+  nums[0].value = '48'; fire(nums[0], 'change'); // first number field = Font (px)
+  eq(readSettings().defaults.global.fontPx, 48, 'global default persisted');
+  eq(box.style.fontSize, '48px', 'overlay picked up the new default (no override present)');
+  CCC.settings.defaults.global = {}; CCC.save(); CCC.refresh();
+  fire(qsa(modal, '.ccc-x')[0], 'click'); // close
+});
+
+test('dashboard: adding a custom site records it and shows the as-is disclaimer', () => {
+  CCC.openPanel();
+  const modal = qsa(ROOT, '.ccc-modal')[0];
+  const textInput = qsa(modal, 'input').find((i) => i.type === 'text');
+  textInput.value = 'example.com';
+  const addBtn = qsa(modal, '.ccc-btn').find((b) => b.textContent === 'Add site');
+  fire(addBtn, 'click');
+  assert(readSettings().customSites.includes('example.com'), 'custom site persisted');
+  assert(findByClass(modal, 'ccc-note'), 'as-is disclaimer present');
+  CCC.settings.customSites = []; CCC.save();
+  fire(qsa(modal, '.ccc-x')[0], 'click'); // close
+});
+
 // -------------------------------------------------------------------- report
-console.log('\nPatreon Caption Customizer — simulation suite\n');
+console.log('\nVideo Streaming Caption Customizer — simulation suite\n');
 console.log(log.join('\n'));
 console.log(`\n${pass} passed, ${fail} failed`);
 console.log('instrumentation:', JSON.stringify(counters));

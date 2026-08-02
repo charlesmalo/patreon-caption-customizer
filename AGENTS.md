@@ -6,12 +6,14 @@ Guidance for AI agents and human contributors working in this repository.
 
 A small browser tool that replaces a video streaming site's fixed,
 bottom-anchored captions with a **draggable, resizable, recolorable caption
-overlay** (similar to YouTube's movable captions), plus optional auto-scrolling
-for long captions. It works on any player that exposes native HTML5 WebVTT
-caption tracks — confirmed on Patreon; also targets Vimeo, Streamable, and
-hls.js/Shaka/Video.js/Plyr/JW Player based sites (see the manifests'/header's
-curated `matches`/`@match` list). It ships in three forms, all built from a
-single source file.
+overlay**, plus optional auto-scrolling for long captions. Captions come from a
+**source adapter**: native HTML5 WebVTT tracks (Patreon, Vimeo, Streamable,
+hls.js/Shaka/Video.js/Plyr/JW Player), or **YouTube's own caption DOM** (hidden
+and mirrored into our overlay). A **settings dashboard** sets persistent default
+looks (global or per-site); live edits are a per-site **session override** that
+layers on top. It ships in three forms, all built from a single source file.
+
+Settings resolution: built-in  <  global default  <  per-site default  <  session override.
 
 ## Golden rule: one source of truth
 
@@ -34,13 +36,21 @@ userscript/                      Subproject 1 — Tampermonkey / Greasemonkey
 chrome-extension/                Subproject 2 — Chrome / Opera / Edge (MV3)
   manifest.json                  version synced from the userscript header by build.js
   content.js                     (generated)   icons/ (generated placeholders)
+  options.html                   loads content.js in "panel mode" to host the dashboard (static)
+  background.js                  opens options on toolbar click; re-registers custom sites (static)
 firefox-extension/               Subproject 3 — Firefox (MV3)
   manifest.json                  browser_specific_settings.gecko.id; version synced by build
   content.js                     (generated)   icons/ (generated placeholders)
+  options.html / background.js   same roles as Chrome (static)
 test/                            DEV-ONLY test suite — never shipped in any artifact
   simulate.js                    Fake-DOM simulation + stress/leak/perf assertions
-build.js                         Generates the three artifacts + icons + version sync
+build.js                         Generates content.js + userscript + icons + version sync
 ```
+
+`options.html` and `background.js` are **static, hand-maintained** per extension
+(not generated). The dashboard UI itself lives in the shared source, so the
+options page is a thin host that sets `window.__CCC_PANEL_MODE__` and loads
+`content.js`.
 
 ## Workflow for any change
 
@@ -66,22 +76,39 @@ Commands:
 - **Keep the source framework-free.** It uses only DOM/Web APIs available to a
   content script in the isolated world (`document`, `video.textTracks`,
   `MutationObserver`, `requestAnimationFrame`, `localStorage`, `getComputedStyle`).
-- **Performance is a feature.** The MutationObserver inspects only added nodes
-  (never re-scans the whole document); the scroll engine cancels its timer and
-  rAF on every new cue. The test suite asserts these — don't regress them.
-- Persisted user settings live in one `localStorage` key: `patreon-caption-style-v2`.
+- **Performance is a feature.** The document MutationObserver inspects only added
+  nodes (never re-scans the whole document); the scroll engine cancels its timer
+  and rAF on every new cue; the **YouTube observer dedupes on caption text** so
+  our own overlay writes never re-trigger it (a real infinite-loop risk — the
+  test suite asserts against it). Don't regress these.
+- **Storage** goes through an abstraction that prefers `chrome.storage.sync`
+  (extensions), then `GM_getValue`/`GM_setValue` (userscript), then
+  `localStorage`. `store.load(cb)` is synchronous for the latter two and async
+  for chrome.storage. Settings live under one key: `ccc-settings-v3` (tiers:
+  `coverage`, `customSites`, `defaults.global`, `defaults.platforms`,
+  `overrides`). The pre-v3 `patreon-caption-style-v2` key is migrated on boot
+  into `overrides['patreon.com']`.
+- The source exposes a namespaced `window.CaptionCustomizer` API (settings,
+  `resolveStyle`, `openPanel`, `mountPanel`, `refresh`) used by the options page
+  and the test harness. It carries no secrets and only affects the user's own
+  caption preferences.
 
 ## How it works (mechanism)
 
-Supported players render captions via native WebVTT text tracks. The script
-finds the player container for a `<video>` (`findContainer`: nearest
-`VideoPlayerRoot`/player-ish ancestor, else the video's parent — so Patreon
-keeps its exact anchor while other sites still work), sets the active caption
-track to `mode = "hidden"` (the browser stops drawing it but still fires
-`cuechange`), then renders each cue into its own absolutely positioned overlay
-that the user can drag, resize (the container, via the corner handle), restyle
-(font size + text color + background color/opacity in the toolbar), and
-optionally auto-scroll.
+A caption **source adapter** feeds text lines into one shared overlay:
+
+- **Native tracks** — `findContainer` picks the player container for a `<video>`
+  (nearest `VideoPlayerRoot`/player-ish ancestor, else the video's parent), the
+  active caption track is set to `mode = "hidden"` (browser stops drawing it but
+  still fires `cuechange`), and each cue's text is rendered.
+- **YouTube** — `youtubeContainer` anchors to the player, YouTube's caption DOM
+  is hidden via CSS, and a MutationObserver mirrors the live segment text (with
+  text-dedup to avoid self-triggering).
+
+The overlay renders `lines: string[]` and the user can drag it, resize the
+container (corner handle), restyle it (font + text/background color + opacity in
+the toolbar), and optionally auto-scroll. Live edits persist as the current
+site's session override; the gear button opens the settings dashboard.
 
 ## Site coverage
 

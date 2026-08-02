@@ -1,10 +1,12 @@
 # Video Streaming Caption Customizer
 
-Take control of captions and subtitles on **video streaming sites**. Move them
-anywhere on the player, resize the caption box, set the font size, recolor the
-text, and recolor the background box with its own opacity, plus optional
-auto-scrolling for long captions — YouTube-style. Your settings persist across
-videos and reloads.
+Take control of captions and subtitles on **video streaming sites, including
+YouTube**. Move them anywhere on the player, resize the caption box, set the
+font size, recolor the text, and recolor the background box with its own
+opacity, plus optional auto-scrolling for long captions. Set **persistent
+default looks** (global or per-site) in a settings dashboard; live edits on a
+video act as a per-site **session override** that persists across reloads until
+you reset it.
 
 Ships three ways, all built from **one source file**:
 
@@ -16,15 +18,18 @@ Ships three ways, all built from **one source file**:
 
 ## Supported sites
 
-Works on any video player that exposes **native HTML5 WebVTT caption tracks** —
-which is a large class of the modern web. Confirmed on **Patreon**; also targets
-**Vimeo**, **Streamable**, and sites built on **hls.js**, **Shaka Player**,
-**dash.js**, **Video.js**, **Plyr**, or **JW Player**.
+Two caption "families" are handled:
 
-Not every site works: some players (most notably **YouTube**) draw captions with
-their own system rather than native tracks — YouTube already includes similar
-drag/resize/color/position options, so it's out of scope. To check any site,
-open DevTools on a video page and run:
+- **YouTube** — YouTube draws captions with its own DOM (not native tracks). The
+  tool reads that live text, hides YouTube's rendering, and mirrors the captions
+  into its own movable/resizable/recolorable overlay.
+- **Native HTML5 WebVTT tracks** — a large class of the modern web. Confirmed on
+  **Patreon**; also targets **Vimeo**, **Streamable**, and sites built on
+  **hls.js**, **Shaka Player**, **dash.js**, **Video.js**, **Plyr**, or
+  **JW Player**.
+
+To check whether a non-YouTube site exposes native tracks, open DevTools on a
+video page and run:
 
 ```js
 [...(document.querySelector('video')?.textTracks ?? [])].map(t => ({kind:t.kind, cues:t.cues?.length}))
@@ -32,11 +37,25 @@ open DevTools on a video page and run:
 
 If it lists caption/subtitle tracks with cues, this tool works there.
 
-The browser extensions run on a **curated list** of these sites (see each
-extension's `manifest.json` `matches`) rather than all websites, so the
-permission prompt stays specific — add more sites there as needed.
+The tool runs on a **curated list** of sites (toggle each in the dashboard)
+rather than all websites, so the extension permission prompt stays specific. You
+can also add your own sites — **as-is, unsupported** (see the dashboard's
+disclaimer).
 
-> Unofficial. Not affiliated with or endorsed by Patreon, Vimeo, Streamable, or any other site.
+> Unofficial. Not affiliated with or endorsed by YouTube, Patreon, Vimeo, Streamable, or any other site.
+
+## Settings dashboard
+
+Open the dashboard from the **gear button** on the caption toolbar (any build),
+from the extension's **options page**, or from the Tampermonkey menu. It lets you:
+
+- **Choose covered sites** — enable/disable each curated site, or add your own.
+- **Set default looks** — a **Global** default plus **per-site** defaults for
+  position, size, font, colors, opacity, and auto-scroll.
+- **Manage the session override** — live edits on a video are saved per site and
+  layer on top of the defaults; clear them here or with **Reset**.
+
+Effective look = built-in  <  global default  <  per-site default  <  session override.
 
 ## Features
 
@@ -46,8 +65,8 @@ permission prompt stays specific — add more sites there as needed.
 - **Recolor** — text color, and background box color **with its own opacity**; the text always stays fully opaque.
 - **Auto-scroll (toggleable)** — long captions scroll up one line at a time inside the box height, paced for reading; turn it off to grow the box and show captions in full.
 - **Adaptive, forgiving toolbar** — the controls flip above/below the box to stay on screen, appear on hover, and wait ~1s before closing so you can reach them.
-- **Persistent** — position, size, font, colors, opacity, and the auto-scroll preference are saved and reused across videos and reloads.
-- **Private & light** — no network requests, no tracking, no dependencies; all state in one `localStorage` key.
+- **Defaults + session override** — set persistent global/per-site defaults in the dashboard; live edits become a per-site override that persists across reloads until Reset.
+- **Private & light** — no network requests, no tracking, no dependencies; all state stays in your browser (extension storage, userscript storage, or `localStorage`).
 
 ## Install
 
@@ -92,18 +111,24 @@ shipped artifact. See [AGENTS.md](AGENTS.md) for contributor guidance.
 
 ## How it works
 
-These players deliver captions through the browser's native WebVTT text tracks.
-The script sets the active caption track to `mode = "hidden"` (the browser stops
-drawing the captions but still fires `cuechange`), then renders each cue into
-its own absolutely-positioned overlay it fully controls. Position and size are
-stored as percentages of the player, so they survive resizing and fullscreen,
-and a MutationObserver re-attaches the overlay as single-page apps swap videos
-in and out.
+A **caption source adapter** feeds text into one shared overlay:
+
+- On **native-track** players, the script sets the active caption track to
+  `mode = "hidden"` (the browser stops drawing captions but still fires
+  `cuechange`) and renders each cue.
+- On **YouTube**, it hides YouTube's caption DOM and mirrors the live text via a
+  MutationObserver.
+
+Either way, each caption is drawn into an absolutely-positioned overlay the tool
+fully controls. Position and size are stored as percentages of the player, so
+they survive resizing and fullscreen, and a MutationObserver re-attaches the
+overlay as single-page apps swap videos in and out.
 
 ## Privacy
 
-No data collected, no network requests, no tracking — all settings stay in your
-browser's `localStorage`. See [PRIVACY.md](PRIVACY.md).
+No data collected, no network requests, no tracking — settings stay in your
+browser (extension `storage`, userscript storage, or `localStorage`). See
+[PRIVACY.md](PRIVACY.md).
 
 ## License
 
