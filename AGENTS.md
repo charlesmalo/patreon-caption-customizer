@@ -125,6 +125,27 @@ container (corner handle), restyle it (font + text/background color + opacity in
 the toolbar), and optionally auto-scroll. Live edits persist as the current
 site's session override; the gear button opens the settings dashboard.
 
+**Interaction model.** Two independent states drive the chrome: `.pcr-hover`
+(set on `pointerenter`) reveals only the resize handle, while `.pcr-open` reveals
+the toolbar and is set *only* by a click — a press whose travel stays under
+`CLICK_SLOP` (4px), detected inside the drag gesture so repositioning never pops
+the bar open. The toolbar closes three ways: the `×` button, an outside click, or
+`HOVER_OUT_MS` (600ms) after the pointer leaves. The outside-click listener is
+registered **once at module scope** over the shared `overlays` set — overlays are
+created per `<video>` and never unregistered, so a per-overlay document listener
+would accumulate across SPA video swaps.
+
+**Stacking.** `sitBelowChrome()` puts the overlay one level *below* the player's
+control bar so clicks on the timeline reach the player rather than the caption.
+The level is measured, not hardcoded: a single value can't serve every player
+(Vimeo's controls sit at z-index 37 over an `auto` video layer; YouTube's at 59
+over 10). It finds the control bar via `KNOWN_CHROME_SEL`, walks up to the direct
+child of the container on that path, reads its computed z-index and subtracts one,
+falling back to `CHROME_FALLBACK_Z` (20). Chrome often mounts after the video, so
+it runs on attach, again after 1500ms, and on every `refresh()`. Consequence: where
+the control bar overlaps the caption, the caption can't be clicked or dragged until
+the chrome auto-hides.
+
 ## Site coverage
 
 The tool runs on a **curated host list**, not all sites — edit the `@match`
