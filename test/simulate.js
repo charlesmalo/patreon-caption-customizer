@@ -472,18 +472,18 @@ test('text stays fully opaque; opacity slider only affects the background', () =
   eq(inputs.length, 2, 'exactly two sliders (font + background opacity), no text-opacity slider');
 });
 
-test('toolbar stays open ~1s after the mouse leaves (close delay)', () => {
+test('hover state persists ~0.6s after the mouse leaves', () => {
   const c = makeContainer();
   const v = makeVideo(c);
   const t = enableCaptions(v);
   showCue(c, t, 'hello', 1);
   const box = boxIn(c)[0];
   fire(box, 'pointerenter');
-  assert(box.classList.contains('pcr-open'), 'opens on hover');
+  assert(box.classList.contains('pcr-hover'), 'hovers on pointerenter');
   fire(box, 'pointerleave');
-  assert(box.classList.contains('pcr-open'), 'still open immediately after leaving');
-  clock.tick(1000);
-  assert(!box.classList.contains('pcr-open'), 'closed after 1s');
+  assert(box.classList.contains('pcr-hover'), 'still hovered immediately after leaving');
+  clock.tick(600);
+  assert(!box.classList.contains('pcr-hover'), 'hover cleared after 600ms');
 });
 
 test('color + opacity controls update the box and persist', () => {
@@ -717,6 +717,44 @@ test('turning coverage off restores the player\'s own captions', () => {
   assert(!own.classList.contains('pcr-native-cap'), 'structural tag cleared too');
   CCC.settings.coverage['patreon.com'] = true; CCC.save(); CCC.refresh();
   assert(c.classList.contains('pcr-hide-native'), 're-hidden when coverage is back on');
+});
+
+// ---- Interaction: hover reveals the handle, click reveals the toolbar -------
+test('hover alone reveals the resize handle but not the toolbar', () => {
+  locationMock.hostname = 'www.patreon.com';
+  const c = makeContainer();
+  const v = makeVideo(c);
+  showCue(c, enableCaptions(v), 'hover me', 1);
+  const box = boxIn(c)[0];
+  fire(box, 'pointerenter');
+  assert(box.classList.contains('pcr-hover'), 'hover state set');
+  assert(!box.classList.contains('pcr-open'), 'toolbar stays closed on hover');
+});
+
+test('leaving the box clears the hover state after 0.6s', () => {
+  const c = makeContainer();
+  const v = makeVideo(c);
+  showCue(c, enableCaptions(v), 'bye', 1);
+  const box = boxIn(c)[0];
+  fire(box, 'pointerenter');
+  fire(box, 'pointerleave');
+  clock.tick(500);
+  assert(box.classList.contains('pcr-hover'), 'still hovered before 600ms');
+  clock.tick(200);
+  assert(!box.classList.contains('pcr-hover'), 'hover cleared after 600ms');
+});
+
+test('re-entering the box cancels the pending hover-out close', () => {
+  const c = makeContainer();
+  const v = makeVideo(c);
+  showCue(c, enableCaptions(v), 'again', 1);
+  const box = boxIn(c)[0];
+  fire(box, 'pointerenter');
+  fire(box, 'pointerleave');
+  clock.tick(400);
+  fire(box, 'pointerenter');
+  clock.tick(500);
+  assert(box.classList.contains('pcr-hover'), 're-entry cancelled the timer');
 });
 
 // -------------------------------------------------------------------- report

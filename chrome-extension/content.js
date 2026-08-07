@@ -183,7 +183,7 @@
   .pcr-handle{position:absolute;right:-7px;bottom:-7px;width:14px;height:14px;
     border:2px solid rgba(255,255,255,.85);border-radius:3px;background:rgba(0,0,0,.55);
     cursor:nwse-resize;pointer-events:auto;display:none;}
-  .pcr-box.pcr-open .pcr-handle{display:block;}
+  .pcr-box.pcr-hover .pcr-handle,.pcr-box.pcr-open .pcr-handle{display:block;}
   .pcr-bar{position:absolute;left:50%;bottom:100%;transform:translateX(-50%);
     display:none;flex-direction:column;gap:5px;margin-bottom:2px;padding:6px 8px;
     border-radius:6px;background:rgba(18,18,18,.96);box-shadow:0 2px 10px rgba(0,0,0,.6);
@@ -318,7 +318,7 @@
     container.appendChild(box);
 
     // --- Visibility state ---
-    let ccOn = false, hasText = false, open = false, dragging = false, hoverTimer = null;
+    let ccOn = false, hasText = false, open = false, hovering = false, dragging = false, hoverTimer = null;
 
     const place = () => {
       box.style.left = style.xPct + '%';
@@ -346,7 +346,7 @@
       bgAlpha.value = Math.round(style.bgAlpha * 100); bgOut.textContent = Math.round(style.bgAlpha * 100) + '%';
       auto.checked = style.autoscroll;
     };
-    const visible = () => box.classList.toggle('pcr-on', isCovered(host) && ccOn && (hasText || open || dragging));
+    const visible = () => box.classList.toggle('pcr-on', isCovered(host) && ccOn && (hasText || open || hovering || dragging));
     apply(); visible();
 
     // ---- Auto-scroll -------------------------------------------------------
@@ -497,14 +497,20 @@
       readAndRender();
     };
 
-    // ---- Hover open/close with a 1s close delay ----------------------------
+    // ---- Hover reveals the resize handle; the toolbar waits for a click -----
+    const HOVER_OUT_MS = 600;
     box.addEventListener('pointerenter', () => {
       if (hoverTimer) { clearTimeout(hoverTimer); hoverTimer = null; }
-      open = true; box.classList.add('pcr-open'); visible();
+      hovering = true; box.classList.add('pcr-hover'); visible();
     });
     box.addEventListener('pointerleave', () => {
       if (hoverTimer) clearTimeout(hoverTimer);
-      hoverTimer = setTimeout(() => { hoverTimer = null; open = false; box.classList.remove('pcr-open'); visible(); }, 1000);
+      hoverTimer = setTimeout(() => {
+        hoverTimer = null;
+        hovering = false; box.classList.remove('pcr-hover');
+        open = false; box.classList.remove('pcr-open');
+        visible();
+      }, HOVER_OUT_MS);
     });
 
     // ---- Drag to reposition ------------------------------------------------
