@@ -3,7 +3,7 @@
 // @namespace    https://github.com/charlesmalo
 // @author       Charles M.
 // @icon         https://raw.githubusercontent.com/charlesmalo/cyber-captions-customizer/main/CyberCaptionsCustomizer.png
-// @version      3.0.1
+// @version      3.1.0
 // @description  Move, resize & recolor captions/subtitles on video streaming sites, including YouTube. Drag anywhere, resize the box, set font size, text color, and background opacity, with optional auto-scroll. Set persistent default looks (global or per-site) in the settings dashboard; live edits act as a per-site session override. Works on YouTube plus players using native HTML5 WebVTT captions: Patreon, Vimeo, Streamable, and hls.js / Shaka / Video.js / Plyr / JW Player based sites.
 // @match        *://*.patreon.com/*
 // @match        *://*.youtube.com/*
