@@ -757,6 +757,43 @@ test('re-entering the box cancels the pending hover-out close', () => {
   assert(box.classList.contains('pcr-hover'), 're-entry cancelled the timer');
 });
 
+test('a click on the caption opens the toolbar', () => {
+  const c = makeContainer();
+  const v = makeVideo(c);
+  showCue(c, enableCaptions(v), 'click me', 1);
+  const box = boxIn(c)[0];
+  fire(box, 'pointerdown', { clientX: 100, clientY: 100, target: box });
+  fire(box, 'pointerup', { clientX: 101, clientY: 100, target: box });
+  assert(box.classList.contains('pcr-open'), 'toolbar opened on click');
+});
+
+test('a drag repositions without opening the toolbar', () => {
+  const c = makeContainer();
+  const v = makeVideo(c);
+  showCue(c, enableCaptions(v), 'drag me', 1);
+  const box = boxIn(c)[0];
+  const before = readOverride('patreon.com').xPct;
+  fire(box, 'pointerdown', { clientX: 100, clientY: 100, target: box });
+  fire(box, 'pointermove', { clientX: 260, clientY: 190, target: box });
+  fire(box, 'pointerup', { clientX: 260, clientY: 190, target: box });
+  assert(!box.classList.contains('pcr-open'), 'drag did not open the toolbar');
+  assert(readOverride('patreon.com').xPct !== before, 'drag still repositioned and persisted');
+});
+
+test('a click starting on a toolbar control does not re-open or drag', () => {
+  const c = makeContainer();
+  const v = makeVideo(c);
+  showCue(c, enableCaptions(v), 'ctl', 1);
+  const box = boxIn(c)[0];
+  fire(box, 'pointerdown', { clientX: 100, clientY: 100, target: box });
+  fire(box, 'pointerup', { clientX: 100, clientY: 100, target: box });
+  const bar = findByClass(box, 'pcr-bar');
+  const xPct = readOverride('patreon.com').xPct;
+  fire(box, 'pointerdown', { clientX: 500, clientY: 500, target: bar });
+  fire(box, 'pointerup', { clientX: 500, clientY: 500, target: bar });
+  eq(readOverride('patreon.com').xPct, xPct, 'pointerdown inside the bar never dragged');
+});
+
 // -------------------------------------------------------------------- report
 console.log('\nVideo Streaming Caption Customizer — simulation suite\n');
 console.log(log.join('\n'));

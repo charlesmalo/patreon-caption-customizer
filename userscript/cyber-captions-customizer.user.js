@@ -539,15 +539,20 @@
       }, HOVER_OUT_MS);
     });
 
-    // ---- Drag to reposition ------------------------------------------------
+    // ---- Drag to reposition; a stationary press is a click that opens the bar
+    const CLICK_SLOP = 4; // px of travel below which a press counts as a click
     box.addEventListener('pointerdown', (e) => {
       if (e.target.closest('.pcr-handle') || e.target.closest('.pcr-bar')) return;
       e.preventDefault();
       const rect = container.getBoundingClientRect();
       const cx = style.xPct / 100 * rect.width, cy = style.yPct / 100 * rect.height;
       const gx = e.clientX - rect.left - cx, gy = e.clientY - rect.top - cy;
+      const startX = e.clientX, startY = e.clientY;
+      let travelled = false;
       dragging = true; box.setPointerCapture(e.pointerId);
       const move = (ev) => {
+        if (Math.abs(ev.clientX - startX) > CLICK_SLOP || Math.abs(ev.clientY - startY) > CLICK_SLOP) travelled = true;
+        if (!travelled) return; // don't nudge the box on a jittery click
         style.xPct = clamp((ev.clientX - rect.left - gx) / rect.width * 100, 2, 98);
         style.yPct = clamp((ev.clientY - rect.top - gy) / rect.height * 100, 4, 96);
         place();
@@ -555,7 +560,10 @@
       const up = () => {
         box.removeEventListener('pointermove', move);
         box.removeEventListener('pointerup', up);
-        dragging = false; saveOverride(host, style); visible();
+        dragging = false;
+        if (travelled) saveOverride(host, style);
+        else { open = true; box.classList.add('pcr-open'); }
+        visible();
       };
       box.addEventListener('pointermove', move);
       box.addEventListener('pointerup', up);
