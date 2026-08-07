@@ -80,7 +80,8 @@ Commands:
   nodes (never re-scans the whole document); the scroll engine cancels its timer
   and rAF on every new cue; the **YouTube observer dedupes on caption text** so
   our own overlay writes never re-trigger it (a real infinite-loop risk — the
-  test suite asserts against it). Don't regress these.
+  test suite asserts against it); the native-caption sniff is bounded and stops
+  once a renderer is found. Don't regress these.
 - **Storage** goes through an abstraction that prefers `chrome.storage.sync`
   (extensions), then `GM_getValue`/`GM_setValue` (userscript), then
   `localStorage`. `store.load(cb)` is synchronous for the latter two and async
@@ -104,6 +105,20 @@ A caption **source adapter** feeds text lines into one shared overlay:
 - **YouTube** — `youtubeContainer` anchors to the player, YouTube's caption DOM
   is hidden via CSS, and a MutationObserver mirrors the live segment text (with
   text-dedup to avoid self-triggering).
+
+**Suppressing the player's own captions.** `mode = "hidden"` only stops the
+*browser* from painting cues. Players that render captions themselves (Vimeo,
+video.js/Brightcove, JW, Plyr, Shaka, YouTube) already keep the track hidden and
+read `activeCues`, so the mode flip is a no-op for them and their captions would
+stack under ours — the user can only move/style ours. `hideNative()` therefore
+puts `.pcr-hide-native` on the player container while the site is covered, which
+hides known renderers by class (`KNOWN_NATIVE_SEL`, kept in sync with the CSS
+block). For players not on that list it falls back to a **structural sniff**:
+find the shallowest element inside the container whose normalized text equals the
+current cue — skipping the video, our overlay, and their ancestors — and tag it
+`.pcr-native-cap`. The sniff is bounded to `NATIVE_SNIFF_TRIES` per overlay and
+is skipped entirely once a known renderer is found, so steady-state cue changes
+do no extra DOM queries. Turning coverage off removes both the class and the tags.
 
 The overlay renders `lines: string[]` and the user can drag it, resize the
 container (corner handle), restyle it (font + text/background color + opacity in

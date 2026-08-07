@@ -22,6 +22,9 @@ const counters = {
 // ------------------------------------------------------------- fake DOM core
 const matchSel = (n, s) => {
   if (n.nodeType !== 1) return false;
+  s = s.trim();
+  if (s.includes(',')) return s.split(',').some((p) => matchSel(n, p));
+  if (s === '*') return true;
   if (s[0] === '.') return (n._className || '').split(/\s+/).includes(s.slice(1));
   if (s.startsWith('[class*=')) {
     const m = s.match(/\[class\*="?([^"\]]+)"?\]/);
@@ -569,7 +572,7 @@ test('YouTube: mirrors the native caption DOM into our overlay and hides it', ()
   setYTCaption(p, ['hello from youtube']);
   eq(findByClass(p, 'pcr-scroll').textContent, 'hello from youtube', 'mirrored YT caption text');
   assert(box[0].classList.contains('pcr-on'), 'overlay visible while a caption is up');
-  assert(p.classList.contains('pcr-yt-hide'), "YouTube's own captions hidden");
+  assert(p.classList.contains('pcr-hide-native'), "YouTube's own captions hidden");
   setYTCaption(p, []);
   assert(!box[0].classList.contains('pcr-on'), 'overlay hidden when caption clears');
   locationMock.hostname = 'www.patreon.com';
@@ -634,6 +637,86 @@ test('dashboard: adding a custom site records it and shows the as-is disclaimer'
   assert(findByClass(modal, 'ccc-note'), 'as-is disclaimer present');
   CCC.settings.customSites = []; CCC.save();
   fire(qsa(modal, '.ccc-x')[0], 'click'); // close
+});
+
+// ---- The player's OWN caption renderer must be suppressed too --------------
+// Players like Vimeo, video.js, JW, Plyr and Shaka keep their text track at
+// mode="hidden" and paint captions into their own DOM. Flipping the mode is a
+// no-op for them, so without an explicit hide the user sees TWO caption boxes
+// and can only move/style ours.
+const addNativeCaps = (container, cls, txt) => {
+  const n = documentMock.createElement('div');
+  n.className = cls;
+  n.textContent = txt;
+  container.appendChild(n);
+  flushMutations();
+  return n;
+};
+
+test("a player's own caption DOM is hidden by class (Vimeo)", () => {
+  locationMock.hostname = 'vimeo.com';
+  const c = makeContainer();
+  const v = makeVideo(c);
+  addNativeCaps(c, 'vp-captions Captions_module_captions__5ed5b89b', 'doubled line');
+  const t = enableCaptions(v);
+  showCue(c, t, 'doubled line', 1);
+  assert(c.classList.contains('pcr-hide-native'), "player's own captions hidden");
+  eq(findByClass(c, 'pcr-scroll').textContent, 'doubled line', 'our overlay still renders');
+  locationMock.hostname = 'www.patreon.com';
+});
+
+test('the same hide applies to video.js / JW / Plyr / Shaka style players', () => {
+  for (const cls of ['vjs-text-track-display', 'jw-captions', 'plyr__captions', 'shaka-text-container']) {
+    const c = makeContainer();
+    const v = makeVideo(c);
+    addNativeCaps(c, cls, 'line');
+    showCue(c, enableCaptions(v), 'line', 1);
+    assert(c.classList.contains('pcr-hide-native'), `hidden for .${cls}`);
+  }
+});
+
+test('an unknown player\'s caption DOM is found structurally and tagged', () => {
+  const c = makeContainer();
+  const v = makeVideo(c);
+  const own = addNativeCaps(c, 'mystery-player-subs', 'hello world');
+  showCue(c, enableCaptions(v), 'hello world', 1);
+  assert(own.classList.contains('pcr-native-cap'), 'unknown renderer tagged for hiding');
+  assert(c.classList.contains('pcr-hide-native'), 'hide class on the container');
+});
+
+test('structural sniffing never tags our own overlay, the video, or the container', () => {
+  const c = makeContainer();
+  const v = makeVideo(c);
+  showCue(c, enableCaptions(v), 'solo caption', 1);
+  assert(!c.classList.contains('pcr-native-cap'), 'container not tagged');
+  assert(!v.classList.contains('pcr-native-cap'), 'video not tagged');
+  eq(qsa(c, '.pcr-native-cap').length, 0, 'nothing tagged when no rival renderer exists');
+  eq(findByClass(c, 'pcr-scroll').textContent, 'solo caption', 'our overlay unaffected');
+});
+
+test('structural sniffing is bounded (no per-cue full-container rescan)', () => {
+  const c = makeContainer();
+  const v = makeVideo(c);
+  const t = enableCaptions(v);
+  showCue(c, t, 'warmup', 1);
+  const before = counters.qsaElement;
+  for (let i = 0; i < 40; i++) showCue(c, t, 'cue ' + i, 1);
+  const perCue = (counters.qsaElement - before) / 40;
+  assert(perCue < 3, `bounded element queries per cue (got ${perCue})`);
+});
+
+test('turning coverage off restores the player\'s own captions', () => {
+  locationMock.hostname = 'www.patreon.com';
+  const c = makeContainer();
+  const v = makeVideo(c);
+  const own = addNativeCaps(c, 'vp-captions', 'native line');
+  showCue(c, enableCaptions(v), 'native line', 1);
+  assert(c.classList.contains('pcr-hide-native'), 'hidden while covered');
+  CCC.settings.coverage['patreon.com'] = false; CCC.save(); CCC.refresh();
+  assert(!c.classList.contains('pcr-hide-native'), 'restored when coverage is off');
+  assert(!own.classList.contains('pcr-native-cap'), 'structural tag cleared too');
+  CCC.settings.coverage['patreon.com'] = true; CCC.save(); CCC.refresh();
+  assert(c.classList.contains('pcr-hide-native'), 're-hidden when coverage is back on');
 });
 
 // -------------------------------------------------------------------- report

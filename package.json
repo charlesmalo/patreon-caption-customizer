@@ -1,6 +1,6 @@
 {
   "name": "cyber-captions-customizer",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "Move, resize, and recolor captions/subtitles on video streaming sites including YouTube (plus Patreon, Vimeo, Streamable, and hls.js/Shaka/Video.js/Plyr/JW Player based players) with a draggable overlay. Set persistent default looks (global or per-site) in a settings dashboard; live edits act as a per-site session override. Ships as a userscript and as Chrome/Opera and Firefox extensions, all built from one source.",
   "license": "MIT",
   "author": "Charles M.",

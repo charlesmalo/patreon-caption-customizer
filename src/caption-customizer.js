@@ -57,6 +57,13 @@
   };
   const isYouTube = () => /(^|\.)youtube(-nocookie)?\.com$/.test(hostname());
 
+  // Players that draw their own caption DOM (see the .pcr-hide-native CSS block).
+  // Kept in sync with it: presence of any of these means no structural sniff is needed.
+  const KNOWN_NATIVE_SEL = '.ytp-caption-window-container,.vp-captions,'
+    + '[class*="CaptionsRenderer_module_captions"],[class*="Captions_module_captions__"],'
+    + '.vjs-text-track-display,.jw-captions,.plyr__captions,.shaka-text-container';
+  const NATIVE_SNIFF_TRIES = 3;
+
   // ---- Built-in defaults ----------------------------------------------------
   const BUILTIN = {
     xPct: 50, yPct: 88,          // box CENTRE position, % of the player
@@ -193,8 +200,22 @@
   .pcr-btn{font:12px sans-serif;padding:2px 8px;cursor:pointer;border-radius:3px;border:1px solid #555;background:#242424;color:#fff;}
   .pcr-btn:hover{background:#333;}
   .pcr-gear{font:13px sans-serif;line-height:1;padding:2px 7px;}
-  /* Hide YouTube's own caption rendering while we mirror it. */
-  .pcr-yt-hide .ytp-caption-window-container{opacity:0 !important;height:0 !important;overflow:hidden !important;pointer-events:none !important;}
+  /* Hide the PLAYER'S OWN caption rendering while our overlay stands in for it.
+     Setting a track to mode="hidden" only stops the *browser* from drawing cues.
+     Players that paint their own caption DOM (Vimeo, video.js, JW, Plyr, Shaka,
+     YouTube) keep the track hidden themselves and read activeCues, so without
+     this the user sees two caption boxes and can only move/style ours.
+     .pcr-native-cap is applied at runtime to renderers we don't know by name. */
+  .pcr-hide-native .ytp-caption-window-container,
+  .pcr-hide-native .vp-captions,
+  .pcr-hide-native [class*="CaptionsRenderer_module_captions"],
+  .pcr-hide-native [class*="Captions_module_captions__"],
+  .pcr-hide-native .vjs-text-track-display,
+  .pcr-hide-native .jw-captions,
+  .pcr-hide-native .plyr__captions,
+  .pcr-hide-native .shaka-text-container,
+  .pcr-hide-native .pcr-native-cap{opacity:0 !important;height:0 !important;padding:0 !important;
+    overflow:hidden !important;pointer-events:none !important;}
   /* Settings dashboard */
   .ccc-modal{position:fixed;inset:0;z-index:2147483600;display:flex;align-items:flex-start;
     justify-content:center;background:rgba(0,0,0,.55);font-family:sans-serif;overflow:auto;}
@@ -358,6 +379,40 @@
       });
     };
 
+    // ---- Suppress the player's own caption rendering -----------------------
+    // Known renderers are handled by the .pcr-hide-native CSS block. For any
+    // player we don't know by name, sniff structurally: find the element inside
+    // this player whose text is exactly the cue we're showing, and tag it. The
+    // sniff is bounded (NATIVE_SNIFF_TRIES per overlay, and skipped entirely
+    // once a known renderer is present) so cue changes stay allocation-cheap.
+    let sniffs = 0;
+    const norm = (s) => String(s || '').replace(/\s+/g, ' ').trim();
+    const sniffNative = (lines) => {
+      if (sniffs >= NATIVE_SNIFF_TRIES) return;
+      const want = norm(lines.join(' '));
+      if (!want) return;
+      sniffs++;
+      if (one(container, KNOWN_NATIVE_SEL)) { sniffs = NATIVE_SNIFF_TRIES; return; }
+      // Anything wrapping the video or our overlay is a layout ancestor, not a
+      // caption renderer — collecting them once is cheaper than a contains() per node.
+      const skip = new Set();
+      for (const start of [video, box]) for (let p = start; p && p !== container; p = p.parentElement) skip.add(p);
+      let best = null, bestDepth = Infinity;
+      for (const n of all(container, '*')) {
+        if (skip.has(n) || n.tagName === 'VIDEO' || n.closest('.pcr-box')) continue;
+        if (norm(n.textContent) !== want) continue;
+        let d = 0; for (let p = n; p && p !== container; p = p.parentElement) d++;
+        if (d && d < bestDepth) { best = n; bestDepth = d; }
+      }
+      if (best) { best.classList.add('pcr-native-cap'); sniffs = NATIVE_SNIFF_TRIES; }
+    };
+    const hideNative = (lines) => {
+      const on = isCovered(host);
+      container.classList.toggle('pcr-hide-native', on);
+      if (on) { if (lines && lines.length) sniffNative(lines); }
+      else all(container, '.pcr-native-cap').forEach((n) => n.classList.remove('pcr-native-cap'));
+    };
+
     // ---- Shared renderer: draw an array of text lines ----------------------
     const showLines = (lines) => {
       if (!lines || !lines.length) { hasText = false; scroll.replaceChildren(); stopScroll(); visible(); return; }
@@ -385,7 +440,12 @@
       const wire = (track) => {
         if (wiredTracks.has(track)) return;
         wiredTracks.add(track);
-        track.addEventListener('cuechange', () => { if (ccOn) showLines(cueLines(track)); });
+        track.addEventListener('cuechange', () => {
+          if (!ccOn) return;
+          const l = cueLines(track);
+          hideNative(l);
+          showLines(l);
+        });
       };
       const sync = () => {
         let on = false, active = null;
@@ -395,8 +455,8 @@
           if (t.mode === 'hidden') { on = true; wire(t); active = t; }
         }
         ccOn = on;
-        if (ccOn && active) showLines(cueLines(active));
-        else { hasText = false; scroll.replaceChildren(); stopScroll(); }
+        if (ccOn && active) { const l = cueLines(active); hideNative(l); showLines(l); }
+        else { hasText = false; scroll.replaceChildren(); stopScroll(); hideNative(null); }
         visible();
       };
       video.textTracks.addEventListener('addtrack', sync);
@@ -424,7 +484,7 @@
       let lastKey = null;
       const readAndRender = () => {
         const lines = ytLines();
-        container.classList.toggle('pcr-yt-hide', isCovered(host)); // hide native only while covered
+        hideNative(lines); // suppress YouTube's own captions only while covered
         const key = lines.join('');
         if (key === lastKey) return;
         lastKey = key;
@@ -513,7 +573,7 @@
       refresh() {
         Object.assign(style, resolveStyle(host));
         apply();
-        if (isYouTube()) container.classList.toggle('pcr-yt-hide', isCovered(host));
+        hideNative(null);
         visible();
         if (style.autoscroll) startScroll(); else stopScroll();
       },
