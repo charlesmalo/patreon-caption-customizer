@@ -794,6 +794,38 @@ test('a click starting on a toolbar control does not re-open or drag', () => {
   eq(readOverride('patreon.com').xPct, xPct, 'pointerdown inside the bar never dragged');
 });
 
+test('a jittery press that never exceeds the threshold still counts as a click', () => {
+  locationMock.hostname = 'www.patreon.com';
+  const c = makeContainer();
+  const v = makeVideo(c);
+  showCue(c, enableCaptions(v), 'jitter', 1);
+  const box = boxIn(c)[0];
+  const before = readOverride('patreon.com').xPct;
+  fire(box, 'pointerdown', { clientX: 100, clientY: 100, target: box });
+  fire(box, 'pointermove', { clientX: 102, clientY: 101, target: box });
+  fire(box, 'pointerup', { clientX: 102, clientY: 101, target: box });
+  assert(box.classList.contains('pcr-open'), 'jittery sub-threshold move still opened the toolbar');
+  eq(readOverride('patreon.com').xPct, before, 'jittery sub-threshold move did not persist an override');
+});
+
+test('several small incremental moves that accumulate past the threshold still count as a drag', () => {
+  locationMock.hostname = 'www.patreon.com';
+  const c = makeContainer();
+  const v = makeVideo(c);
+  showCue(c, enableCaptions(v), 'creep', 1);
+  const box = boxIn(c)[0];
+  const before = readOverride('patreon.com').xPct;
+  fire(box, 'pointerdown', { clientX: 100, clientY: 100, target: box });
+  fire(box, 'pointermove', { clientX: 102, clientY: 100, target: box });
+  fire(box, 'pointermove', { clientX: 104, clientY: 100, target: box });
+  fire(box, 'pointermove', { clientX: 106, clientY: 100, target: box });
+  fire(box, 'pointermove', { clientX: 108, clientY: 100, target: box });
+  fire(box, 'pointermove', { clientX: 110, clientY: 100, target: box });
+  fire(box, 'pointerup', { clientX: 110, clientY: 100, target: box });
+  assert(!box.classList.contains('pcr-open'), 'incremental creep past the threshold did not open the toolbar');
+  assert(readOverride('patreon.com').xPct !== before, 'incremental creep past the threshold persisted as a drag');
+});
+
 // -------------------------------------------------------------------- report
 console.log('\nVideo Streaming Caption Customizer — simulation suite\n');
 console.log(log.join('\n'));
