@@ -181,7 +181,8 @@
   .pcr-box{position:absolute;transform:translate(-50%,-50%);
     box-sizing:border-box;padding:.15em .5em;border-radius:4px;font-family:inherit;
     line-height:1.3;text-align:center;text-shadow:0 0 3px #000,0 0 3px #000;
-    cursor:move;user-select:none;pointer-events:auto;display:none;white-space:pre-wrap;}
+    cursor:move;user-select:none;pointer-events:auto;display:none;white-space:pre-wrap;
+    touch-action:none;}
   .pcr-box.pcr-on{display:block;}
   .pcr-text{pointer-events:none;}
   .pcr-box.pcr-scroll-on .pcr-text{overflow:hidden;}
@@ -435,15 +436,27 @@
     // while YouTube's sit at 59 over 10. So read the real layer and go one below.
     const sitBelowChrome = () => {
       const bar = one(container, KNOWN_CHROME_SEL);
-      let z = CHROME_FALLBACK_Z;
-      if (bar) {
-        // Walk up to the direct child of container — that's what we stack against.
-        let top = bar;
-        while (top.parentElement && top.parentElement !== container) top = top.parentElement;
-        const raw = parseInt(getComputedStyle(top).zIndex, 10);
-        if (!isNaN(raw)) z = raw - 1;
+      if (!bar) {
+        // No chrome found at all — z-index can't be measured against anything,
+        // so fall back to a constant that's safely above the video layer.
+        box.style.zIndex = String(CHROME_FALLBACK_Z);
+        return;
       }
-      box.style.zIndex = String(Math.max(0, z));
+      // Walk up to the direct child of container — that's what we stack against.
+      let top = bar;
+      while (top.parentElement && top.parentElement !== container) top = top.parentElement;
+      const raw = parseInt(getComputedStyle(top).zIndex, 10);
+      // A bar WAS found, but either its stacking ancestor has z-index:auto (NaN)
+      // or is already at/below 0 (flooring would tie or go negative). In both
+      // cases z-index alone can't put us below it, so fall back to DOM tree
+      // order: z-index 0, and move the box before the chrome element so it
+      // paints underneath regardless of the (absent or tied) z-index.
+      if (isNaN(raw) || raw <= 0) {
+        box.style.zIndex = '0';
+        if (box.nextSibling !== top) container.insertBefore(box, top);
+        return;
+      }
+      box.style.zIndex = String(raw - 1);
     };
     sitBelowChrome();
     setTimeout(sitBelowChrome, 1500); // controls often mount after the video
@@ -537,7 +550,12 @@
       if (hoverTimer) { clearTimeout(hoverTimer); hoverTimer = null; }
       hovering = true; box.classList.add('pcr-hover'); visible();
     });
-    box.addEventListener('pointerleave', () => {
+    box.addEventListener('pointerleave', (e) => {
+      // On touch, the UA fires pointerleave right after pointerup, which would
+      // instantly arm the close timer and make the click-opened toolbar close
+      // itself moments later. Only mouse hover should arm this timer; treat a
+      // missing pointerType (synthetic events, older UAs) as mouse.
+      if (e.pointerType && e.pointerType !== 'mouse') return;
       if (hoverTimer) clearTimeout(hoverTimer);
       hoverTimer = setTimeout(() => {
         hoverTimer = null;
@@ -574,6 +592,7 @@
       const up = () => {
         box.removeEventListener('pointermove', move);
         box.removeEventListener('pointerup', up);
+        box.removeEventListener('pointercancel', up);
         dragging = false;
         if (travelled) saveOverride(host, style);
         else { open = true; box.classList.add('pcr-open'); }
@@ -581,6 +600,7 @@
       };
       box.addEventListener('pointermove', move);
       box.addEventListener('pointerup', up);
+      box.addEventListener('pointercancel', up);
     });
 
     // ---- Corner drag to resize the container -------------------------------
@@ -597,10 +617,12 @@
       const up = () => {
         handle.removeEventListener('pointermove', move);
         handle.removeEventListener('pointerup', up);
+        handle.removeEventListener('pointercancel', up);
         dragging = false; saveOverride(host, style); startScroll(); visible();
       };
       handle.addEventListener('pointermove', move);
       handle.addEventListener('pointerup', up);
+      handle.addEventListener('pointercancel', up);
     });
 
     // ---- Toolbar controls --------------------------------------------------

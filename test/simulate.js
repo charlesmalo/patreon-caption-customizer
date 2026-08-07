@@ -102,6 +102,11 @@ class FakeElement {
   set textContent(v) { this.childNodes.slice().forEach((k) => this._remove(k)); if (v !== '' && v != null) this._adopt(new FakeText(String(v))); }
   get scrollHeight() { return this._scrollHeight || 0; }
   get parentElement() { return this.parentNode && this.parentNode.nodeType === 1 ? this.parentNode : null; }
+  get nextSibling() {
+    if (!this.parentNode) return null;
+    const i = this.parentNode.childNodes.indexOf(this);
+    return i >= 0 && i + 1 < this.parentNode.childNodes.length ? this.parentNode.childNodes[i + 1] : null;
+  }
   _adopt(node) {
     if (node.nodeType === 11) { const kids = node.childNodes.slice(); node.childNodes.length = 0; kids.forEach((k) => this._adopt(k)); return; }
     if (node.parentNode) node.parentNode._remove(node);
@@ -110,6 +115,15 @@ class FakeElement {
   }
   _remove(node) { const i = this.childNodes.indexOf(node); if (i >= 0) this.childNodes.splice(i, 1); node.parentNode = null; }
   appendChild(node) { this._adopt(node); return node; }
+  insertBefore(node, ref) {
+    if (node.nodeType === 11) { const kids = node.childNodes.slice(); node.childNodes.length = 0; kids.forEach((k) => this.insertBefore(k, ref)); return node; }
+    if (node.parentNode) node.parentNode._remove(node);
+    node.parentNode = this;
+    const i = ref ? this.childNodes.indexOf(ref) : -1;
+    if (i >= 0) this.childNodes.splice(i, 0, node); else this.childNodes.push(node);
+    if (isConnected(this)) record([node]);
+    return node;
+  }
   append(...args) { for (const a of args) this._adopt(typeof a === 'string' ? new FakeText(a) : a); }
   replaceChildren(...args) { this.childNodes.slice().forEach((k) => this._remove(k)); if (args.length) this.append(...args); }
   remove() { if (this.parentNode) this.parentNode._remove(this); }
@@ -751,6 +765,60 @@ test('leaving the box clears the hover state after 0.6s', () => {
   assert(!box.classList.contains('pcr-hover'), 'hover cleared after 600ms');
 });
 
+test('a touch pointerleave does not arm the close timer, but a mouse one still does', () => {
+  const c = makeContainer();
+  const v = makeVideo(c);
+  showCue(c, enableCaptions(v), 'touch', 1);
+  const box = boxIn(c)[0];
+  // Open the toolbar via a tap (click), as touch would.
+  fire(box, 'pointerdown', { clientX: 10, clientY: 10, target: box, pointerType: 'touch' });
+  fire(box, 'pointerup', { clientX: 10, clientY: 10, target: box, pointerType: 'touch' });
+  assert(box.classList.contains('pcr-open'), 'tap opened the toolbar');
+  // On touch, the UA fires pointerleave right after pointerup. It must NOT
+  // arm the 600ms close timer, or the toolbar would close itself right after opening.
+  fire(box, 'pointerleave', { pointerType: 'touch' });
+  clock.tick(600);
+  assert(box.classList.contains('pcr-open'), 'toolbar stays open after a touch pointerleave');
+  // A real mouse pointerleave must still arm the timer as before.
+  fire(box, 'pointerleave', { pointerType: 'mouse' });
+  clock.tick(600);
+  assert(!box.classList.contains('pcr-open'), 'toolbar closes after a mouse pointerleave + 600ms');
+});
+
+test('pointercancel during a drag clears dragging and removes the move/up listeners', () => {
+  const c = makeContainer();
+  const v = makeVideo(c);
+  const t = enableCaptions(v);
+  showCue(c, t, 'cancel me', 1);
+  const box = boxIn(c)[0];
+  fire(box, 'pointerdown', { clientX: 100, clientY: 100, target: box });
+  fire(box, 'pointermove', { clientX: 200, clientY: 150, target: box }); // travel past the click threshold
+  const moveCountBefore = (box._ev.pointermove || []).length;
+  fire(box, 'pointercancel', { target: box });
+  eq((box._ev.pointermove || []).length, moveCountBefore - 1, 'pointermove listener removed on cancel');
+  eq((box._ev.pointerup || []).length, 0, 'pointerup listener removed on cancel');
+  eq((box._ev.pointercancel || []).length, 0, 'pointercancel listener removed on cancel');
+  // If `dragging` were left stuck true (the pre-fix bug), the box would stay
+  // visible ('.pcr-on') forever even with no caption text. Prove it was cleared
+  // by removing the caption and checking the box actually hides.
+  t.mode = 'disabled';
+  assert(!box.classList.contains('pcr-on'), 'box hides once the caption clears — dragging was not left stuck true');
+});
+
+test('pointercancel during a handle resize clears dragging and removes its listeners', () => {
+  const c = makeContainer();
+  const v = makeVideo(c);
+  showCue(c, enableCaptions(v), 'resize cancel', 1);
+  const box = boxIn(c)[0];
+  const handle = findByClass(box, 'pcr-handle');
+  fire(handle, 'pointerdown', { clientX: 0, clientY: 0 });
+  const moveCountBefore = (handle._ev.pointermove || []).length;
+  fire(handle, 'pointercancel', {});
+  eq((handle._ev.pointermove || []).length, moveCountBefore - 1, 'pointermove listener removed on cancel');
+  eq((handle._ev.pointerup || []).length, 0, 'pointerup listener removed on cancel');
+  eq((handle._ev.pointercancel || []).length, 0, 'pointercancel listener removed on cancel');
+});
+
 test('re-entering the box cancels the pending hover-out close', () => {
   const c = makeContainer();
   const v = makeVideo(c);
@@ -902,12 +970,39 @@ test('caption falls back to a safe z-index when no control bar is found', () => 
   eq(boxIn(c)[0].style.zIndex, '20', 'fallback applied');
 });
 
-test('a control bar at z-index 0 never pushes the caption negative', () => {
+test('a control bar at z-index 0 is beaten by DOM tree order, not a floored z-index', () => {
   const c = makeContainer();
-  makeChrome(c, 'plyr__controls', 0);
+  const bar = makeChrome(c, 'plyr__controls', 0);
   const v = makeVideo(c);
   showCue(c, enableCaptions(v), 'z', 1);
-  eq(boxIn(c)[0].style.zIndex, '0', 'floored at zero');
+  const box = boxIn(c)[0];
+  // Flooring at 0 alone is a no-op (tie with the bar's own z-index 0, and tree
+  // order would still paint the box last / on top). The box must actually be
+  // moved before the chrome wrapper in the DOM so it paints underneath.
+  eq(box.style.zIndex, '0', 'z-index set to 0');
+  assert(box.nextSibling === bar.parentElement, 'box moved immediately before the chrome wrapper in tree order');
+});
+
+test('a control bar whose stacking ancestor has z-index:auto is beaten via DOM tree order', () => {
+  const c = makeContainer();
+  const bar = makeChrome(c, 'vjs-control-bar', 'auto'); // e.g. Video.js stock skin: no z-index set
+  const v = makeVideo(c);
+  showCue(c, enableCaptions(v), 'z', 1);
+  const box = boxIn(c)[0];
+  eq(box.style.zIndex, '0', 'z-index set to 0 (NaN cannot be used to decide order)');
+  assert(box.nextSibling === bar.parentElement, 'box moved immediately before the chrome wrapper in tree order');
+});
+
+test('sitBelowChrome re-running against an auto/zero bar does not reshuffle the DOM (idempotent)', () => {
+  const c = makeContainer();
+  makeChrome(c, 'vjs-control-bar', 'auto');
+  const v = makeVideo(c);
+  showCue(c, enableCaptions(v), 'z', 1);
+  const box = boxIn(c)[0];
+  const before = c.childNodes.slice();
+  clock.tick(1500); // triggers the second sitBelowChrome() call
+  eq(c.childNodes.length, before.length, 'no nodes added or removed');
+  eq(c.childNodes.indexOf(box), before.indexOf(box), 'box position unchanged on re-run');
 });
 
 // -------------------------------------------------------------------- report

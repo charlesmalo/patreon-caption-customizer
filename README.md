@@ -64,7 +64,8 @@ Effective look = built-in  <  global default  <  per-site default  <  session ov
 - **Font size** — a slider in the toolbar.
 - **Recolor** — text color, and background box color **with its own opacity**; the text always stays fully opaque.
 - **Auto-scroll (toggleable)** — long captions scroll up one line at a time inside the box height, paced for reading; turn it off to grow the box and show captions in full.
-- **Adaptive, forgiving toolbar** — the controls flip above/below the box to stay on screen, appear on hover, and wait ~1s before closing so you can reach them.
+- **Adaptive, click-to-open toolbar** — the controls flip above/below the box to stay on screen and open on a **click** (not hover), so a passing cursor never pops them up over the video. The resize handle still appears on hover. The toolbar closes via the **×** button, a click outside the box, or **0.6s** after the pointer leaves.
+- **Stays behind the player controls** — the caption box sits below the player's own control bar in stacking order, so clicks on the timeline/scrubber reach the player instead of the caption.
 - **Defaults + session override** — set persistent global/per-site defaults in the dashboard; live edits become a per-site override that persists across reloads until Reset.
 - **Private & light** — no network requests, no tracking, no dependencies; all state stays in your browser (extension storage, userscript storage, or `localStorage`).
 
@@ -89,10 +90,22 @@ See each subproject's README for store-submission notes.
 Open a video on a supported site and turn captions on. Then:
 - **Drag** the box to reposition it.
 - **Hover** the box and **drag the corner handle** to resize the container.
-- The hover **toolbar** sets font size, text/background color and opacity, and toggles **Auto-scroll long captions**.
+- **Click** the box (a stationary press, not a drag) to open the **toolbar** — it sets font size, text/background color and opacity, and toggles **Auto-scroll long captions**. Close it with the **×** button, by clicking outside the box, or it closes on its own **0.6s** after your pointer leaves.
 - **Reset** restores defaults.
 
 The box appears while a caption is on screen and stays put while you're actively adjusting it.
+
+> **Can't grab the caption to drag it?** The box now sits *behind* the player's
+> control bar (so timeline/scrubber clicks still reach the player), so if it
+> ends up positioned under a control bar that never auto-hides, clicking or
+> dragging it directly can be hard. Reposition it from the **settings
+> dashboard** instead — open it via the gear button, the extension's
+> **Options** page, or (userscript) the Tampermonkey menu's **Caption
+> Customizer settings** command — and set the **X position** / **Y position**
+> fields under "Default look". A live session override (if one is active —
+> the dashboard's "This session" section will say so) takes priority over
+> defaults, so hit **Clear session override** there first if changing the
+> default position doesn't seem to move the box.
 
 ## Develop
 
