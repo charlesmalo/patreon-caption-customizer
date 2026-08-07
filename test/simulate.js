@@ -117,6 +117,7 @@ class FakeElement {
   closest(sel) { let n = this; while (n && n.nodeType === 1) { if (matchSel(n, sel)) return n; n = n.parentNode; } return null; }
   addEventListener(t, fn) { (this._ev[t] || (this._ev[t] = [])).push(fn); }
   removeEventListener(t, fn) { const a = this._ev[t] || []; const i = a.indexOf(fn); if (i >= 0) a.splice(i, 1); }
+  contains(node) { let n = node; while (n) { if (n === this) return true; n = n.parentNode; } return false; }
   setPointerCapture() {}
   releasePointerCapture() {}
   getBoundingClientRect() { return this._rect || { left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0 }; }
@@ -136,6 +137,9 @@ const documentMock = {
   createTextNode: (t) => new FakeText(t),
   createDocumentFragment: () => new FakeFragment(),
   querySelectorAll: (sel) => { counters.qsaDocument++; return qsa(ROOT, sel); },
+  _ev: {},
+  addEventListener(t, fn) { (this._ev[t] || (this._ev[t] = [])).push(fn); },
+  removeEventListener(t, fn) { const a = this._ev[t] || []; const i = a.indexOf(fn); if (i >= 0) a.splice(i, 1); },
 };
 
 const localStorageMock = (() => {
@@ -824,6 +828,40 @@ test('several small incremental moves that accumulate past the threshold still c
   fire(box, 'pointerup', { clientX: 110, clientY: 100, target: box });
   assert(!box.classList.contains('pcr-open'), 'incremental creep past the threshold did not open the toolbar');
   assert(readOverride('patreon.com').xPct !== before, 'incremental creep past the threshold persisted as a drag');
+});
+
+test('the x button closes the toolbar', () => {
+  const c = makeContainer();
+  const v = makeVideo(c);
+  showCue(c, enableCaptions(v), 'close me', 1);
+  const box = boxIn(c)[0];
+  fire(box, 'pointerdown', { clientX: 10, clientY: 10, target: box });
+  fire(box, 'pointerup', { clientX: 10, clientY: 10, target: box });
+  assert(box.classList.contains('pcr-open'), 'open first');
+  const x = qsa(box, '.pcr-close')[0];
+  assert(x, 'close button exists');
+  fire(x, 'click');
+  assert(!box.classList.contains('pcr-open'), 'x closed the toolbar');
+});
+
+test('a click outside the box closes the toolbar; inside does not', () => {
+  const c = makeContainer();
+  const v = makeVideo(c);
+  showCue(c, enableCaptions(v), 'outside', 1);
+  const box = boxIn(c)[0];
+  fire(box, 'pointerdown', { clientX: 10, clientY: 10, target: box });
+  fire(box, 'pointerup', { clientX: 10, clientY: 10, target: box });
+  assert(box.classList.contains('pcr-open'), 'open first');
+  fire(documentMock, 'pointerdown', { target: findByClass(box, 'pcr-scroll') });
+  assert(box.classList.contains('pcr-open'), 'click inside the box kept it open');
+  fire(documentMock, 'pointerdown', { target: ROOT });
+  assert(!box.classList.contains('pcr-open'), 'click outside closed it');
+});
+
+test('the outside-click listener is registered once, not once per overlay', () => {
+  const before = (documentMock._ev.pointerdown || []).length;
+  for (let i = 0; i < 5; i++) { const c = makeContainer(); makeVideo(c); }
+  eq((documentMock._ev.pointerdown || []).length, before, 'no extra document listeners per overlay');
 });
 
 // -------------------------------------------------------------------- report

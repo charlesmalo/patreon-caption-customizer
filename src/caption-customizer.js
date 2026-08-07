@@ -260,6 +260,15 @@
   const overlays = new Set();
   const refreshAll = () => overlays.forEach((o) => o.refresh());
 
+  // One document listener for every overlay: overlays are created per <video>
+  // and never unregistered, so a per-overlay listener would accumulate across
+  // SPA video swaps.
+  if (!PANEL_MODE) {
+    document.addEventListener('pointerdown', (e) => {
+      overlays.forEach((o) => { if (o.closeBar) o.closeBar(e.target); });
+    }, true);
+  }
+
   // ---- Per-video controller ------------------------------------------------
   const seen = new WeakSet();
 
@@ -310,7 +319,8 @@
     const actions = el('div', 'pcr-actions');
     const gear = el('button', 'pcr-btn pcr-gear'); gear.type = 'button'; gear.textContent = '⚙'; gear.title = 'Caption settings';
     const reset = el('button', 'pcr-btn pcr-reset'); reset.type = 'button'; reset.textContent = 'Reset';
-    actions.append(gear, reset);
+    const closeBtn = el('button', 'pcr-btn pcr-close'); closeBtn.type = 'button'; closeBtn.textContent = '×'; closeBtn.title = 'Close';
+    actions.append(gear, reset, closeBtn);
 
     bar.append(fontRow, textRow, boxRow, autoRow, actions);
     box.append(bar, text, handle);
@@ -512,6 +522,12 @@
       }, HOVER_OUT_MS);
     });
 
+    const closeBar = () => {
+      if (!open) return;
+      open = false; box.classList.remove('pcr-open'); visible();
+    };
+    closeBtn.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); closeBar(); });
+
     // ---- Drag to reposition; a stationary press is a click that opens the bar
     const CLICK_SLOP = 4; // px of travel below which a press counts as a click
     box.addEventListener('pointerdown', (e) => {
@@ -591,6 +607,7 @@
         visible();
         if (style.autoscroll) startScroll(); else stopScroll();
       },
+      closeBar(target) { if (!box.contains(target)) closeBar(); },
     });
 
     if (yt) wireYouTube(); else wireNative();
