@@ -64,6 +64,12 @@
     + '.vjs-text-track-display,.jw-captions,.plyr__captions,.shaka-text-container';
   const NATIVE_SNIFF_TRIES = 3;
 
+  // The player's own control chrome. Our overlay must stack BELOW this so that
+  // clicks on the timeline reach the player instead of the caption box.
+  const KNOWN_CHROME_SEL = '.ytp-chrome-bottom,.vp-player-ui-overlays,.vp-controls,'
+    + '.vjs-control-bar,.jw-controls,.plyr__controls,.shaka-bottom-controls';
+  const CHROME_FALLBACK_Z = 20; // above the video layer, below chrome, on every player measured
+
   // ---- Built-in defaults ----------------------------------------------------
   const BUILTIN = {
     xPct: 50, yPct: 88,          // box CENTRE position, % of the player
@@ -171,7 +177,7 @@
 
   // ---- Styles --------------------------------------------------------------
   const CSS = `
-  .pcr-box{position:absolute;z-index:2147483000;transform:translate(-50%,-50%);
+  .pcr-box{position:absolute;transform:translate(-50%,-50%);
     box-sizing:border-box;padding:.15em .5em;border-radius:4px;font-family:inherit;
     line-height:1.3;text-align:center;text-shadow:0 0 3px #000,0 0 3px #000;
     cursor:move;user-select:none;pointer-events:auto;display:none;white-space:pre-wrap;}
@@ -423,6 +429,24 @@
       else all(container, '.pcr-native-cap').forEach((n) => n.classList.remove('pcr-native-cap'));
     };
 
+    // Stack just under the player's control bar. A single hardcoded value can't
+    // work: measured live, Vimeo's controls sit at 37 over an `auto` video layer
+    // while YouTube's sit at 59 over 10. So read the real layer and go one below.
+    const sitBelowChrome = () => {
+      const bar = one(container, KNOWN_CHROME_SEL);
+      let z = CHROME_FALLBACK_Z;
+      if (bar) {
+        // Walk up to the direct child of container — that's what we stack against.
+        let top = bar;
+        while (top.parentElement && top.parentElement !== container) top = top.parentElement;
+        const raw = parseInt(getComputedStyle(top).zIndex, 10);
+        if (!isNaN(raw)) z = raw - 1;
+      }
+      box.style.zIndex = String(Math.max(0, z));
+    };
+    sitBelowChrome();
+    setTimeout(sitBelowChrome, 1500); // controls often mount after the video
+
     // ---- Shared renderer: draw an array of text lines ----------------------
     const showLines = (lines) => {
       if (!lines || !lines.length) { hasText = false; scroll.replaceChildren(); stopScroll(); visible(); return; }
@@ -604,6 +628,7 @@
         Object.assign(style, resolveStyle(host));
         apply();
         hideNative(null);
+        sitBelowChrome();
         visible();
         if (style.autoscroll) startScroll(); else stopScroll();
       },

@@ -155,6 +155,7 @@ const localStorageMock = (() => {
 const getComputedStyleMock = (el) => ({
   position: (el.style && el.style.position) || 'static',
   lineHeight: (el.style && el.style.lineHeight) || '28.6px', // 22px * 1.3
+  zIndex: (el.style && el.style.zIndex) || 'auto',
 });
 
 // ----------------------------------------------------------- virtual clock
@@ -369,6 +370,7 @@ test('a long caption scrolls a bounded number of steps then stops', () => {
   const c = makeContainer();
   const v = makeVideo(c);
   const t = enableCaptions(v);
+  clock.tick(1500); // let the per-overlay control-chrome recheck (Task 4) settle before baselining
   const before = clock.pendingTimers();
   showCue(c, t, 'a very long caption that spans five lines', 5);
   eq(clock.pendingTimers(), before + 1, 'one scroll timer scheduled');
@@ -385,6 +387,7 @@ test('rapid caption changes never leak timers or rAF callbacks', () => {
   const c = makeContainer();
   const v = makeVideo(c);
   const t = enableCaptions(v);
+  clock.tick(1500); // let the per-overlay control-chrome recheck (Task 4) settle before baselining
   const baseT = clock.pendingTimers();
   const baseR = clock.pendingRaf();
   for (let i = 0; i < 200; i++) {
@@ -862,6 +865,49 @@ test('the outside-click listener is registered once, not once per overlay', () =
   const before = (documentMock._ev.pointerdown || []).length;
   for (let i = 0; i < 5; i++) { const c = makeContainer(); makeVideo(c); }
   eq((documentMock._ev.pointerdown || []).length, before, 'no extra document listeners per overlay');
+});
+
+// ---- Stacking: the caption must lose click priority to the control bar -----
+const makeChrome = (container, barCls, wrapperZ) => {
+  const wrap = documentMock.createElement('div');
+  wrap.style.zIndex = String(wrapperZ);
+  const bar = documentMock.createElement('div');
+  bar.className = barCls;
+  wrap.appendChild(bar);
+  container.appendChild(wrap);
+  flushMutations();
+  return bar;
+};
+
+test('caption sits one level below a YouTube-shaped control bar', () => {
+  const c = makeContainer();
+  makeChrome(c, 'ytp-chrome-bottom', 59);
+  const v = makeVideo(c);
+  showCue(c, enableCaptions(v), 'z', 1);
+  eq(boxIn(c)[0].style.zIndex, '58', 'one below the chrome layer');
+});
+
+test('caption sits one level below a Vimeo-shaped control bar', () => {
+  const c = makeContainer();
+  makeChrome(c, 'vp-controls', 37);
+  const v = makeVideo(c);
+  showCue(c, enableCaptions(v), 'z', 1);
+  eq(boxIn(c)[0].style.zIndex, '36', 'one below the chrome layer');
+});
+
+test('caption falls back to a safe z-index when no control bar is found', () => {
+  const c = makeContainer();
+  const v = makeVideo(c);
+  showCue(c, enableCaptions(v), 'z', 1);
+  eq(boxIn(c)[0].style.zIndex, '20', 'fallback applied');
+});
+
+test('a control bar at z-index 0 never pushes the caption negative', () => {
+  const c = makeContainer();
+  makeChrome(c, 'plyr__controls', 0);
+  const v = makeVideo(c);
+  showCue(c, enableCaptions(v), 'z', 1);
+  eq(boxIn(c)[0].style.zIndex, '0', 'floored at zero');
 });
 
 // -------------------------------------------------------------------- report
