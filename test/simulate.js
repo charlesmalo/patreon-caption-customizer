@@ -963,11 +963,13 @@ test('caption sits one level below a Vimeo-shaped control bar', () => {
   eq(boxIn(c)[0].style.zIndex, '36', 'one below the chrome layer');
 });
 
-test('caption falls back to a safe z-index when no control bar is found', () => {
+test('with no known control bar but a video present, the box ties to the video\'s own z-index, not the old constant', () => {
   const c = makeContainer();
   const v = makeVideo(c);
   showCue(c, enableCaptions(v), 'z', 1);
-  eq(boxIn(c)[0].style.zIndex, '20', 'fallback applied');
+  const box = boxIn(c)[0];
+  eq(box.style.zIndex, '0', 'z-index tied to the video (auto -> 0), not CHROME_FALLBACK_Z (20)');
+  eq(v.nextSibling, box, 'box sits immediately after the video in tree order');
 });
 
 test('a control bar at z-index 0 is beaten by DOM tree order, not a floored z-index', () => {
@@ -1003,6 +1005,82 @@ test('sitBelowChrome re-running against an auto/zero bar does not reshuffle the 
   clock.tick(1500); // triggers the second sitBelowChrome() call
   eq(c.childNodes.length, before.length, 'no nodes added or removed');
   eq(c.childNodes.indexOf(box), before.indexOf(box), 'box position unchanged on re-run');
+});
+
+// ---- Task-remedy: the no-control-bar fallback anchors to the video ---------
+
+test('Streamable-shaped: no known control bar matches, so the box anchors to the video (not the old constant 20)', () => {
+  const c = makeContainer();
+  const v = makeVideo(c); // video z=1, direct child of container; attach fires now (order: [v, box])
+  v.style.zIndex = '1';
+  const box = boxIn(c)[0];
+  // Chrome mounts AFTER the box already exists (the real-world race the 1500ms
+  // recheck exists for), landing between the video and the box — the fallback
+  // must move the box back to right after the video on the recheck.
+  const catcher = documentMock.createElement('div'); catcher.style.zIndex = '4'; // full-bleed events catcher
+  const controlsish = documentMock.createElement('div');
+  controlsish.className = 'svp-fake-toolbar'; // deliberately NOT in KNOWN_CHROME_SEL -> forces the fallback path
+  controlsish.style.zIndex = '6';
+  c.insertBefore(catcher, box);
+  c.insertBefore(controlsish, box); // order now: [v, catcher, controlsish, box]
+  clock.tick(1500); // second sitBelowChrome() call
+  eq(v.nextSibling, box, 'box ends up immediately after the video in tree order');
+  eq(box.style.zIndex, '1', "z-index equals the video's level (1), not CHROME_FALLBACK_Z (20)");
+});
+
+test('Dailymotion-shaped: box lands right after the video_view wrapper with z-index 0', () => {
+  const c = makeContainer();
+  const wrap = documentMock.createElement('div');
+  wrap.className = 'video_view';
+  wrap.style.zIndex = '0';
+  c.appendChild(wrap); flushMutations();
+  const v = documentMock.createElement('video'); v.textTracks = makeTrackList();
+  wrap.appendChild(v); flushMutations(); // attach fires; order in c: [wrap, box]
+  const box = boxIn(c)[0];
+  // Later chrome-ish siblings at z-index:auto mount after the box already exists.
+  const sib1 = documentMock.createElement('div'); sib1.style.zIndex = 'auto';
+  const sib2 = documentMock.createElement('div'); sib2.style.zIndex = 'auto';
+  c.insertBefore(sib1, box);
+  c.insertBefore(sib2, box); // order now: [wrap, sib1, sib2, box]
+  clock.tick(1500); // second sitBelowChrome() call
+  eq(wrap.nextSibling, box, 'box ends up immediately after the video_view wrapper in tree order');
+  eq(box.style.zIndex, '0', "z-index equals the wrapper's level (0)");
+});
+
+test('the no-control-bar fallback is meaningfully idempotent: the recheck must not reshuffle or duplicate', () => {
+  const c = makeContainer();
+  const v = makeVideo(c); // attach fires; order: [v, box]
+  const box = boxIn(c)[0];
+  // A later, unrelated sibling mounts after the box (chrome mounting late) —
+  // this is the shape that would expose a missing idempotence guard: an
+  // unconditional container.insertBefore(box, box) would strip the box out
+  // and re-append it, shoving it past this later sibling.
+  const laterChrome = documentMock.createElement('div');
+  laterChrome.className = 'not-a-known-chrome-class';
+  laterChrome.style.zIndex = 'auto';
+  c.appendChild(laterChrome); flushMutations(); // order: [v, box, laterChrome]
+  const childCountBefore = c.childNodes.length;
+  const posBefore = c.childNodes.indexOf(box);
+  clock.tick(1500); // second sitBelowChrome() call — must be a no-op here
+  eq(c.childNodes.length, childCountBefore, "no duplicate insertion (container's child count unchanged)");
+  eq(c.childNodes.indexOf(box), posBefore, 'box position stable across the delayed re-measure');
+});
+
+test('.svp-controls now takes the measured path (Streamable is a known control bar)', () => {
+  const c = makeContainer();
+  makeChrome(c, 'svp-controls', 6);
+  const v = makeVideo(c);
+  showCue(c, enableCaptions(v), 'z', 1);
+  eq(boxIn(c)[0].style.zIndex, '5', 'one below the chrome layer via the measured path');
+});
+
+test('a container with no <video> at all still falls back to the last-resort constant 20', () => {
+  const c = makeContainer();
+  const v = makeVideo(c);
+  const box = boxIn(c)[0];
+  v.remove(); // no <video> remains inside container
+  CCC.refresh(); // re-runs sitBelowChrome() via every overlay's refresh()
+  eq(box.style.zIndex, '20', 'CHROME_FALLBACK_Z used as the true last resort');
 });
 
 // -------------------------------------------------------------------- report

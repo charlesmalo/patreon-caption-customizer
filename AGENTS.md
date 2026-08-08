@@ -140,9 +140,18 @@ control bar so clicks on the timeline reach the player rather than the caption.
 The level is measured, not hardcoded: a single value can't serve every player
 (Vimeo's controls sit at z-index 37 over an `auto` video layer; YouTube's at 59
 over 10). It finds the control bar via `KNOWN_CHROME_SEL`, walks up to the direct
-child of the container on that path, reads its computed z-index and subtracts one,
-falling back to `CHROME_FALLBACK_Z` (20). Chrome often mounts after the video, so
-it runs on attach, again after 1500ms, and on every `refresh()`. Consequence: where
+child of the container on that path, reads its computed z-index and subtracts one
+(falling back to DOM tree order below the bar when that level is `auto` or <= 0).
+When no known control bar is found at all, it anchors to the `<video>` instead of
+guessing a number: walk up from the video to the direct child of `container` on
+that path (`vTop`; may be the video itself), tie the box's z-index to vTop's
+computed level, and place the box immediately after vTop in tree order — so it
+paints above the video while any other chrome (a later sibling, or a higher
+z-index) still paints above the box. `CHROME_FALLBACK_Z` (20) is a last-resort
+constant used only when no `<video>` can be located inside `container` at all
+(e.g. it was removed). Chrome often mounts after the video, so all of this runs
+on attach, again after 1500ms, and on every `refresh()` — idempotently, so the
+recheck is a no-op once the box is already correctly placed. Consequence: where
 the control bar overlaps the caption, the caption can't be clicked or dragged until
 the chrome auto-hides.
 

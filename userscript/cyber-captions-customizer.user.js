@@ -94,8 +94,8 @@
   // The player's own control chrome. Our overlay must stack BELOW this so that
   // clicks on the timeline reach the player instead of the caption box.
   const KNOWN_CHROME_SEL = '.ytp-chrome-bottom,.vp-player-ui-overlays,.vp-controls,'
-    + '.vjs-control-bar,.jw-controls,.plyr__controls,.shaka-bottom-controls';
-  const CHROME_FALLBACK_Z = 20; // above the video layer, below chrome, on every player measured
+    + '.vjs-control-bar,.jw-controls,.plyr__controls,.shaka-bottom-controls,.svp-controls';
+  const CHROME_FALLBACK_Z = 20; // last resort only: used when no <video> can be found inside container
 
   // ---- Built-in defaults ----------------------------------------------------
   const BUILTIN = {
@@ -463,9 +463,27 @@
     const sitBelowChrome = () => {
       const bar = one(container, KNOWN_CHROME_SEL);
       if (!bar) {
-        // No chrome found at all — z-index can't be measured against anything,
-        // so fall back to a constant that's safely above the video layer.
-        box.style.zIndex = String(CHROME_FALLBACK_Z);
+        // No known control bar. Anchor to the video itself instead of
+        // guessing a constant: walk up from `video` to the direct child of
+        // `container` on that path (`vTop`; may be the video itself), tie
+        // the box's z-index to vTop's computed level, and place the box
+        // immediately after vTop in tree order. The box then paints above
+        // the video (same z-index, later in tree order) while every other
+        // piece of player chrome — a later sibling, or one with a higher
+        // z-index — still paints above the box. Idempotent: only touch the
+        // DOM when the box isn't already exactly there.
+        let vTop = video;
+        while (vTop.parentElement && vTop.parentElement !== container) vTop = vTop.parentElement;
+        if (vTop.parentElement !== container) {
+          // No <video> can be located inside container (e.g. it was removed) —
+          // there's nothing real to measure a stacking level against.
+          box.style.zIndex = String(CHROME_FALLBACK_Z);
+          return;
+        }
+        const rawV = parseInt(getComputedStyle(vTop).zIndex, 10);
+        box.style.zIndex = String(isNaN(rawV) ? 0 : rawV);
+        const target = vTop.nextSibling;
+        if (target !== box) container.insertBefore(box, target);
         return;
       }
       // Walk up to the direct child of container — that's what we stack against.
